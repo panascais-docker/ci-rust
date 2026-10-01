@@ -16,7 +16,7 @@ func TestResolveNames(t *testing.T) {
 		{"1.85", "alpine", "1.85.1", []string{"1.85-alpine", "1.85.1-alpine", "1.85", "1.85.1"}},
 		{"1.85", "trixie", "1.85.1", []string{"1.85-trixie", "1.85.1-trixie"}},
 		{"1.98", "alpine", "1.98.1", []string{"1.98-alpine", "1.98.1-alpine", "1-alpine", "latest-alpine", "1.98", "1.98.1", "1", "latest"}},
-		{"1.98", "bookworm", "1.98.1", []string{"1.98-bookworm", "1.98.1-bookworm", "1-bookworm", "latest-bookworm"}},
+		{"1.98", "trixie", "1.98.1", []string{"1.98-trixie", "1.98.1-trixie", "1-trixie", "latest-trixie"}},
 	} {
 		if actual := resolveNames(lines, testCase.line, testCase.variant, testCase.version); !slices.Equal(actual, testCase.expected) {
 			t.Errorf("resolveNames(%s, %s) = %q, expected %q", testCase.line, testCase.variant, actual, testCase.expected)

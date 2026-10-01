@@ -37,7 +37,6 @@ var (
 	checksumPattern = regexp.MustCompile(`^([0-9a-f]{64})\s`)
 	bases           = []base{
 		{variant: "alpine", repository: "library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
-		{variant: "bookworm", repository: "library/debian", tag: regexp.MustCompile(`^bookworm-slim$`)},
 		{variant: "trixie", repository: "library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
 	}
 	tools = []tool{

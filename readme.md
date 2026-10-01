@@ -6,34 +6,34 @@
 [![Docker Image Size](https://img.shields.io/docker/image-size/panascais/ci-rust.svg?style=flat-square)](https://hub.docker.com/r/panascais/ci-rust)
 [![License](https://img.shields.io/github/license/panascais-docker/ci-rust.svg?style=flat-square)](https://hub.docker.com/r/panascais/ci-rust)
 
-Rust CI images for `linux/amd64` and `linux/arm64`. Each image installs the toolchain with [`rustup`](https://rustup.rs) on alpine 3.24, Debian trixie or Debian bookworm. They come with `cargo nextest`, `cargo deny`, `just` and `sccache`, and `cargo build --target <arch>-unknown-linux-musl` produces a static binary without extra setup.
+Rust CI images for `linux/amd64` and `linux/arm64`. Each image installs the toolchain with [`rustup`](https://rustup.rs) on alpine 3.24 or Debian trixie. They come with `cargo nextest`, `cargo deny`, `just` and `sccache`, and `cargo build --target <arch>-unknown-linux-musl` produces a static binary without extra setup.
 
 | **Tag:**      | **Command:**                           | **Rust Version:** | **Variants:**                 |
 | ------------- | -------------------------------------- | ----------------- | ----------------------------- |
-| `latest`      | `docker pull panascais/ci-rust`        | `1.98.x`          | **alpine**, trixie, bookworm  |
-| `1.98`, `1`   | `docker pull panascais/ci-rust:1.98`   | `1.98.x`          | **alpine**, trixie, bookworm  |
-| `1.97`        | `docker pull panascais/ci-rust:1.97`   | `1.97.x`          | **alpine**, trixie, bookworm  |
-| `1.96`        | `docker pull panascais/ci-rust:1.96`   | `1.96.x`          | **alpine**, trixie, bookworm  |
-| `1.95`        | `docker pull panascais/ci-rust:1.95`   | `1.95.x`          | **alpine**, trixie, bookworm  |
-| `1.94`        | `docker pull panascais/ci-rust:1.94`   | `1.94.x`          | **alpine**, trixie, bookworm  |
-| `1.93`        | `docker pull panascais/ci-rust:1.93`   | `1.93.x`          | **alpine**, trixie, bookworm  |
-| `1.92`        | `docker pull panascais/ci-rust:1.92`   | `1.92.x`          | **alpine**, trixie, bookworm  |
-| `1.91`        | `docker pull panascais/ci-rust:1.91`   | `1.91.x`          | **alpine**, trixie, bookworm  |
-| `1.90`        | `docker pull panascais/ci-rust:1.90`   | `1.90.x`          | **alpine**, trixie, bookworm  |
-| `1.89`        | `docker pull panascais/ci-rust:1.89`   | `1.89.x`          | **alpine**, trixie, bookworm  |
-| `1.88`        | `docker pull panascais/ci-rust:1.88`   | `1.88.x`          | **alpine**, trixie, bookworm  |
-| `1.87`        | `docker pull panascais/ci-rust:1.87`   | `1.87.x`          | **alpine**, trixie, bookworm  |
-| `1.86`        | `docker pull panascais/ci-rust:1.86`   | `1.86.x`          | **alpine**, trixie, bookworm  |
-| `1.85`        | `docker pull panascais/ci-rust:1.85`   | `1.85.x`          | **alpine**, trixie, bookworm  |
+| `latest`      | `docker pull panascais/ci-rust`        | `1.98.x`          | **alpine**, trixie            |
+| `1.98`, `1`   | `docker pull panascais/ci-rust:1.98`   | `1.98.x`          | **alpine**, trixie            |
+| `1.97`        | `docker pull panascais/ci-rust:1.97`   | `1.97.x`          | **alpine**, trixie            |
+| `1.96`        | `docker pull panascais/ci-rust:1.96`   | `1.96.x`          | **alpine**, trixie            |
+| `1.95`        | `docker pull panascais/ci-rust:1.95`   | `1.95.x`          | **alpine**, trixie            |
+| `1.94`        | `docker pull panascais/ci-rust:1.94`   | `1.94.x`          | **alpine**, trixie            |
+| `1.93`        | `docker pull panascais/ci-rust:1.93`   | `1.93.x`          | **alpine**, trixie            |
+| `1.92`        | `docker pull panascais/ci-rust:1.92`   | `1.92.x`          | **alpine**, trixie            |
+| `1.91`        | `docker pull panascais/ci-rust:1.91`   | `1.91.x`          | **alpine**, trixie            |
+| `1.90`        | `docker pull panascais/ci-rust:1.90`   | `1.90.x`          | **alpine**, trixie            |
+| `1.89`        | `docker pull panascais/ci-rust:1.89`   | `1.89.x`          | **alpine**, trixie            |
+| `1.88`        | `docker pull panascais/ci-rust:1.88`   | `1.88.x`          | **alpine**, trixie            |
+| `1.87`        | `docker pull panascais/ci-rust:1.87`   | `1.87.x`          | **alpine**, trixie            |
+| `1.86`        | `docker pull panascais/ci-rust:1.86`   | `1.86.x`          | **alpine**, trixie            |
+| `1.85`        | `docker pull panascais/ci-rust:1.85`   | `1.85.x`          | **alpine**, trixie            |
 
 Tags are built as `<version>[-<variant>]`:
 
 | **Part:** | **Values:**                                                | **When left out:** |
 | --------- | ---------------------------------------------------------- | ------------------ |
 | version   | `latest`, a major `1`, a line `1.98`, a patch `1.98.1`     | always required    |
-| variant   | `-alpine`, `-trixie`, `-bookworm`                          | alpine             |
+| variant   | `-alpine`, `-trixie`                                       | alpine             |
 
-For example `1.98` and `1.98-alpine` are Rust 1.98 on alpine, `1.98.1-trixie` is Rust 1.98.1 on Debian trixie and `latest-bookworm` is the newest Rust on Debian bookworm. The pipeline builds every line from 1.85 on, each in all three variants. There are no nightly images, only stable releases.
+For example `1.98` and `1.98-alpine` are Rust 1.98 on alpine, `1.98.1-trixie` is Rust 1.98.1 on Debian trixie and `latest-trixie` is the newest Rust on Debian trixie. The pipeline builds every line from 1.85 on, each in both variants. There are no nightly images, only stable releases.
 
 ## Included tools
 
@@ -96,7 +96,7 @@ This builds the base images inline, smoke tests every variant of a line for the 
 GitHub Actions splits the work into four jobs:
 
 - `plan` compares fingerprints with the pushed images and skips bases and lines that did not change.
-- `base` builds the six shared bases once on native amd64 and arm64 runners and pushes them to `ghcr.io/panascais-docker/ci-rust/base`. These are internal and not meant to be pulled.
+- `base` builds the four shared bases once on native amd64 and arm64 runners and pushes them to `ghcr.io/panascais-docker/ci-rust/base`. These are internal and not meant to be pulled.
 - `build` installs the toolchain of each line on top, again natively per architecture, and pushes by digest.
 - `publish` tags both architectures together, so every tag is a manifest list for both platforms.
 

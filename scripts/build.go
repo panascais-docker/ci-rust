@@ -97,10 +97,10 @@ func buildLine(line, platform string) error {
 		return err
 	}
 
-	publishing := os.Getenv("GITHUB_ACTIONS") == "true"
+	pushing := os.Getenv("GITHUB_ACTIONS") == "true"
 
 	revision := "local"
-	if publishing {
+	if pushing {
 		if revision, err = output("git", "rev-parse", "--short", "HEAD"); err != nil {
 			return err
 		}
@@ -113,13 +113,13 @@ func buildLine(line, platform string) error {
 		return err
 	}
 
-	if !publishing {
+	if !pushing {
 		load := func(build build) ([]string, []string) { return build.tags(registries...), nil }
 
 		return bake(builds, arguments, platform, "image", load, "--load")
 	}
 
-	return publish(builds, arguments, platform)
+	return push(builds, arguments, platform)
 }
 
 func planBuilds(line string, tags, digests configuration) ([]build, error) {
@@ -264,7 +264,7 @@ func (build build) tags(registries ...registry) []string {
 	return tags
 }
 
-func publish(builds []build, arguments map[string]string, platform string) error {
+func push(builds []build, arguments map[string]string, platform string) error {
 	for _, registry := range registries {
 		if err := registry.login(); err != nil {
 			return err

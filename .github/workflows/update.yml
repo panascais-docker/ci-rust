@@ -45,8 +45,8 @@ jobs:
                     git push origin master
                   fi
 
-    deploy:
-        name: ${{ matrix.line }} ${{ matrix.architecture }}
+    build:
+        name: ${{ matrix.line }} (${{ matrix.architecture }})
         needs: [update]
         if: needs.update.outputs.lines != '[]'
         runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
@@ -54,8 +54,8 @@ jobs:
         strategy:
             max-parallel: 8
             matrix:
-                line: ${{ fromJSON(needs.update.outputs.lines) }}
                 architecture: [amd64, arm64]
+                line: ${{ fromJSON(needs.update.outputs.lines) }}
         steps:
             - name: pull repository
               uses: actions/checkout@v6
@@ -95,9 +95,9 @@ jobs:
                   path: digests/
                   if-no-files-found: error
 
-    merge:
-        name: merge
-        needs: [deploy]
+    publish:
+        name: publish
+        needs: [build]
         runs-on: blacksmith-2vcpu-ubuntu-2404
         steps:
             - name: pull repository
@@ -127,9 +127,9 @@ jobs:
                   merge-multiple: true
 
             - name: tag the multi-platform docker container images
-              id: merge
+              id: publish
               run: |
-                  go run ./scripts merge
+                  go run ./scripts publish
               env:
                   CONTAINER_REGISTRY_TOKEN: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
                   CONTAINER_REGISTRY_USERNAME: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}

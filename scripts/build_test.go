@@ -48,12 +48,12 @@ func TestValidatePin(t *testing.T) {
 	}
 }
 
-func TestPlanMerges(t *testing.T) {
+func TestPlanManifests(t *testing.T) {
 	digest := func(character string) string { return "sha256:" + strings.Repeat(character, 64) }
 	tags := configuration{"1.98": {"alpine": "1.98.1-alpine3.24"}}
 	digests := configuration{"1.98": {"alpine": digest("a")}}
 
-	creations, err := planMerges(map[string]configuration{
+	creations, err := planManifests(map[string]configuration{
 		"amd64": {"1.98": {"alpine": digest("b")}},
 		"arm64": {"1.98": {"alpine": digest("c")}},
 	}, tags, digests)
@@ -62,7 +62,7 @@ func TestPlanMerges(t *testing.T) {
 	}
 
 	if len(creations) != len(registries) {
-		t.Fatalf("planMerges() = %d creations, expected %d", len(creations), len(registries))
+		t.Fatalf("planManifests() = %d creations, expected %d", len(creations), len(registries))
 	}
 
 	expected := []string{
@@ -79,10 +79,10 @@ func TestPlanMerges(t *testing.T) {
 		"quay.io/panascais/ci-rust@" + digest("c"),
 	}
 	if !slices.Equal(creations[2], expected) {
-		t.Errorf("planMerges() = %q, expected %q", creations[2], expected)
+		t.Errorf("planManifests() = %q, expected %q", creations[2], expected)
 	}
 
-	if _, err := planMerges(map[string]configuration{"amd64": {"1.98": {"alpine": digest("b")}}}, tags, digests); err == nil {
-		t.Error("planMerges() without an arm64 digest succeeded, expected an error")
+	if _, err := planManifests(map[string]configuration{"amd64": {"1.98": {"alpine": digest("b")}}}, tags, digests); err == nil {
+		t.Error("planManifests() without an arm64 digest succeeded, expected an error")
 	}
 }

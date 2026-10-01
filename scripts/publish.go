@@ -10,16 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func mergeCommand() *cobra.Command {
+func publishCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "merge",
+		Use:   "publish",
 		Short: "Tag the pushed amd64 and arm64 digests of every built line as multi-platform images",
 		Args:  cobra.NoArgs,
-		RunE:  func(_ *cobra.Command, _ []string) error { return merge() },
+		RunE:  func(_ *cobra.Command, _ []string) error { return publish() },
 	}
 }
 
-func merge() error {
+func publish() error {
 	tags, err := readConfiguration(tagsFile)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func merge() error {
 		return err
 	}
 
-	creations, err := planMerges(pushed, tags, digests)
+	creations, err := planManifests(pushed, tags, digests)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func readPushed() (map[string]configuration, error) {
 	return pushed, nil
 }
 
-func planMerges(pushed map[string]configuration, tags, digests configuration) ([][]string, error) {
+func planManifests(pushed map[string]configuration, tags, digests configuration) ([][]string, error) {
 	lines := map[string]bool{}
 	for _, architecture := range architectures {
 		for line := range pushed[architecture] {

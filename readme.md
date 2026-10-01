@@ -90,7 +90,7 @@ go run ./scripts build 1.98
 
 This smoke tests every variant of a line for the local architecture and loads the images. The smoke test builds [`smoke/`](smoke), a crate depending on `zstd` and `ring`, as a static musl binary, rebuilds it to check for an sccache hit and runs its tests with `cargo nextest`. Pass `--platform linux/amd64` to run the same on Apple Silicon through emulation.
 
-`configuration/tags.json` and `configuration/digests.json` pin the upstream images by digest, `configuration/tools.json` pins the tool versions and their sha256 per architecture, and `go run ./scripts update` refreshes all three. In GitHub Actions each line builds natively on an amd64 and an arm64 runner, pushes by digest, and `go run ./scripts merge` tags both digests together, so every tag is a manifest list for both platforms.
+`configuration/tags.json` and `configuration/digests.json` pin the upstream images by digest, `configuration/tools.json` pins the tool versions and their sha256 per architecture, and `go run ./scripts update` refreshes all three. In GitHub Actions each line builds natively on an amd64 and an arm64 runner, pushes by digest, and `go run ./scripts publish` tags both digests together, so every tag is a manifest list for both platforms.
 
 ## Contributors
 

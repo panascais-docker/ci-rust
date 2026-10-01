@@ -1,0 +1,14 @@
+{
+    "alpine": {
+        "digest": "sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6",
+        "image": "library/alpine:3.24"
+    },
+    "bookworm": {
+        "digest": "sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251",
+        "image": "library/debian:bookworm-slim"
+    },
+    "trixie": {
+        "digest": "sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a",
+        "image": "library/debian:trixie-slim"
+    }
+}

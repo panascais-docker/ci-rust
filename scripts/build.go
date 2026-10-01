@@ -17,7 +17,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const digestsDirectory = "digests"
+const (
+	digestsDirectory = "digests"
+	defaultVariant   = "alpine"
+)
 
 type registry struct {
 	host    string
@@ -25,19 +28,16 @@ type registry struct {
 	secrets string
 }
 
-var (
-	registries = []registry{
-		{host: "ghcr.io", image: "ghcr.io/panascais-docker/ci-rust/ci-rust", secrets: "CONTAINER"},
-		{image: "panascais/ci-rust", secrets: "DOCKER"},
-		{host: "quay.io", image: "quay.io/panascais/ci-rust", secrets: "QUAY"},
-	}
-	defaultVariants = []string{"alpine", "trixie", "bookworm"}
-)
+var registries = []registry{
+	{host: "ghcr.io", image: "ghcr.io/panascais-docker/ci-rust/ci-rust", secrets: "CONTAINER"},
+	{image: "panascais/ci-rust", secrets: "DOCKER"},
+	{host: "quay.io", image: "quay.io/panascais/ci-rust", secrets: "QUAY"},
+}
 
 type build struct {
 	line    string
 	variant string
-	image   string
+	base    string
 	version string
 	names   []string
 }
@@ -77,12 +77,12 @@ func buildCommand() *cobra.Command {
 }
 
 func buildLine(line, platform string) error {
-	tags, err := readConfiguration(tagsFile)
+	lines, err := readConfiguration(linesFile)
 	if err != nil {
 		return err
 	}
 
-	digests, err := readConfiguration(digestsFile)
+	basePins, err := readConfiguration(basesFile)
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func buildLine(line, platform string) error {
 		return err
 	}
 
-	builds, err := planBuilds(line, tags, digests)
+	builds, err := planBuilds(line, lines, basePins)
 	if err != nil {
 		return err
 	}
@@ -103,6 +103,12 @@ func buildLine(line, platform string) error {
 	if pushing {
 		if revision, err = output("git", "rev-parse", "--short", "HEAD"); err != nil {
 			return err
+		}
+
+		for _, registry := range registries {
+			if err := registry.login(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -122,59 +128,38 @@ func buildLine(line, platform string) error {
 	return push(builds, arguments, platform)
 }
 
-func planBuilds(line string, tags, digests configuration) ([]build, error) {
-	variants, found := tags[line]
-	if !found {
-		return nil, fmt.Errorf("invalid line %q, expected one of %s", line, strings.Join(sortedKeys(tags), ", "))
+func planBuilds(line string, lines, basePins configuration) ([]build, error) {
+	if _, found := lines[line]; !found {
+		return nil, fmt.Errorf("invalid line %q, expected one of %s", line, strings.Join(sortedKeys(lines), ", "))
+	}
+
+	version := lines[line]["version"]
+	if !regexp.MustCompile(`^` + regexp.QuoteMeta(line) + `\.\d+$`).MatchString(version) {
+		return nil, fmt.Errorf("invalid rust version %q for %s", version, line)
 	}
 
 	var builds []build
-	for _, variant := range sortedKeys(variants) {
-		tag, digest := variants[variant], digests[line][variant]
-		if err := validatePin(line, variant, tag, digest); err != nil {
-			return nil, err
+	for _, variant := range sortedKeys(basePins) {
+		image, digest := basePins[variant]["image"], basePins[variant]["digest"]
+		if image == "" || !digestPattern.MatchString(digest) {
+			return nil, fmt.Errorf("invalid %s base %q@%q", variant, image, digest)
 		}
 
-		version, _, _ := strings.Cut(tag, "-")
 		builds = append(builds, build{
 			line:    line,
 			variant: variant,
-			image:   repository + ":" + tag + "@" + digest,
+			base:    image + "@" + digest,
 			version: version,
-			names:   resolveNames(tags, line, variant, version),
+			names:   resolveNames(sortedKeys(lines), line, variant, version),
 		})
 	}
 
 	return builds, nil
 }
 
-func validatePin(line, variant, tag, digest string) error {
-	system := `alpine3\.\d+`
-	if variant != "alpine" {
-		system = "slim-" + regexp.QuoteMeta(variant)
-	}
-
-	if !regexp.MustCompile(`^` + regexp.QuoteMeta(line) + `\.\d+-` + system + `$`).MatchString(tag) {
-		return fmt.Errorf("invalid rust tag %q for %s %s", tag, line, variant)
-	}
-
-	if !digestPattern.MatchString(digest) {
-		return fmt.Errorf("invalid rust digest %q for %s %s", digest, line, variant)
-	}
-
-	return nil
-}
-
-func resolveNames(tags configuration, line, variant, version string) []string {
-	lines := sortedKeys(tags)
-	withVariant := where(lines, func(candidate string) bool {
-		_, found := tags[candidate][variant]
-
-		return found
-	})
-
-	names := aliases(withVariant, line, version, "-"+variant)
-	if defaultVariant(tags[line]) == variant {
+func resolveNames(lines []string, line, variant, version string) []string {
+	names := aliases(lines, line, version, "-"+variant)
+	if variant == defaultVariant {
 		names = append(names, aliases(lines, line, version, "")...)
 	}
 
@@ -199,16 +184,6 @@ func aliases(lines []string, line, version, suffix string) []string {
 
 func where(lines []string, keep func(string) bool) []string {
 	return slices.DeleteFunc(slices.Clone(lines), func(line string) bool { return !keep(line) })
-}
-
-func defaultVariant(variants map[string]string) string {
-	for _, variant := range defaultVariants {
-		if _, found := variants[variant]; found {
-			return variant
-		}
-	}
-
-	return ""
 }
 
 func buildArguments(toolPins configuration, revision string) map[string]string {
@@ -265,12 +240,6 @@ func (build build) tags(registries ...registry) []string {
 }
 
 func push(builds []build, arguments map[string]string, platform string) error {
-	for _, registry := range registries {
-		if err := registry.login(); err != nil {
-			return err
-		}
-	}
-
 	var images []string
 	for _, registry := range registries {
 		images = append(images, registry.image)
@@ -341,7 +310,7 @@ func bakeDefinition(builds []build, arguments map[string]string, platform, stage
 	for _, build := range builds {
 		args := maps.Clone(arguments)
 		args["DESCRIPTION"] = description(build, arguments)
-		args["RUST_IMAGE"] = build.image
+		args["BASE_IMAGE"] = build.base
 		args["RUST_VERSION"] = build.version
 		args["SYSTEM"] = build.system()
 

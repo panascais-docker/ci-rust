@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -20,14 +21,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const minimumLine = "1.85"
+const (
+	minimumLine      = "1.85"
+	manifestsURL     = "https://static.rust-lang.org/manifests.txt"
+	rustupURL        = "https://static.rust-lang.org/rustup"
+	rustupReleaseURL = rustupURL + "/release-stable.toml"
+)
 
 var (
-	architectures  = []string{"amd64", "arm64"}
-	triples        = map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
-	digestPattern  = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
-	releasePattern = regexp.MustCompile(`^(\d+\.\d+)\.(\d+)-(?:alpine3\.(\d+)|slim-(trixie|bookworm))$`)
-	tools          = []tool{
+	architectures   = []string{"amd64", "arm64"}
+	triples         = map[string]string{"amd64": "x86_64", "arm64": "aarch64"}
+	digestPattern   = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	manifestPattern = regexp.MustCompile(`/channel-rust-(\d+\.\d+)\.(\d+)\.toml$`)
+	rustupPattern   = regexp.MustCompile(`(?m)^version = '(\d+\.\d+\.\d+)'$`)
+	checksumPattern = regexp.MustCompile(`^([0-9a-f]{64})\s`)
+	bases           = []base{
+		{variant: "alpine", repository: "library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
+		{variant: "bookworm", repository: "library/debian", tag: regexp.MustCompile(`^bookworm-slim$`)},
+		{variant: "trixie", repository: "library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
+	}
+	tools = []tool{
 		{name: "cargo-deny", repository: "EmbarkStudios/cargo-deny", release: regexp.MustCompile(`^(\d+\.\d+\.\d+)$`), asset: "cargo-deny-%s-%s-unknown-linux-musl.tar.gz"},
 		{name: "cargo-nextest", repository: "nextest-rs/nextest", release: regexp.MustCompile(`^cargo-nextest-(\d+\.\d+\.\d+)$`), asset: "cargo-nextest-%s-%s-unknown-linux-musl.tar.gz"},
 		{name: "just", repository: "casey/just", release: regexp.MustCompile(`^(\d+\.\d+\.\d+)$`), asset: "just-%s-%s-unknown-linux-musl.tar.gz"},
@@ -35,10 +48,10 @@ var (
 	}
 )
 
-type release struct {
-	patch  int
-	alpine int
-	tag    string
+type base struct {
+	variant    string
+	repository string
+	tag        *regexp.Regexp
 }
 
 type tool struct {
@@ -63,7 +76,7 @@ type githubAsset struct {
 func updateCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "update",
-		Short: `Pin the newest upstream image per line and variant and the newest tools, printing the changed lines as a JSON array`,
+		Short: `Pin the newest base images, Rust patch per line and tools, printing the changed lines as a JSON array`,
 		Args:  cobra.NoArgs,
 		RunE:  func(command *cobra.Command, _ []string) error { return update(command.Context()) },
 	}
@@ -73,12 +86,12 @@ func update(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
-	digestsBefore, err := readConfiguration(digestsFile)
+	basesBefore, err := readConfiguration(basesFile)
 	if err != nil {
 		return err
 	}
 
-	tagsBefore, err := readConfiguration(tagsFile)
+	linesBefore, err := readConfiguration(linesFile)
 	if err != nil {
 		return err
 	}
@@ -88,12 +101,14 @@ func update(ctx context.Context) error {
 		return err
 	}
 
-	names, err := crane.ListTags(repository, dockerHub(ctx)...)
+	manifests, err := fetch(ctx, manifestsURL, nil)
 	if err != nil {
 		return err
 	}
 
-	digests, tags, err := resolvePins(ctx, resolveReleases(names), digestsBefore, tagsBefore)
+	lines := resolveLines(string(manifests))
+
+	basePins, err := resolveBases(ctx, basesBefore)
 	if err != nil {
 		return err
 	}
@@ -103,106 +118,114 @@ func update(ctx context.Context) error {
 		return err
 	}
 
-	if digests.equal(digestsBefore) && tags.equal(tagsBefore) && toolPins.equal(toolPinsBefore) {
+	if lines.equal(linesBefore) && basePins.equal(basesBefore) && toolPins.equal(toolPinsBefore) {
 		fmt.Println("[]")
 
 		return nil
 	}
 
-	if err := writeConfiguration(digestsFile, digests); err != nil {
-		return err
+	for path, value := range map[string]configuration{basesFile: basePins, linesFile: lines, toolsFile: toolPins} {
+		if err := writeConfiguration(path, value); err != nil {
+			return err
+		}
 	}
 
-	if err := writeConfiguration(tagsFile, tags); err != nil {
-		return err
+	changed := changedLines(lines, linesBefore)
+	if !basePins.equal(basesBefore) || !toolPins.equal(toolPinsBefore) {
+		changed = sortedKeys(lines)
 	}
 
-	if err := writeConfiguration(toolsFile, toolPins); err != nil {
-		return err
-	}
-
-	changed := changedLines(digests, tags, digestsBefore, tagsBefore)
-	if !toolPins.equal(toolPinsBefore) {
-		changed = sortedKeys(tags)
-	}
-
-	lines, err := json.Marshal(changed)
+	encoded, err := json.Marshal(changed)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println(string(lines))
+	fmt.Println(string(encoded))
 
 	return nil
 }
 
-func changedLines(digests, tags, digestsBefore, tagsBefore configuration) []string {
-	lines := []string{}
-	for _, line := range sortedKeys(tags) {
-		if digests.changed(digestsBefore, line) || tags.changed(tagsBefore, line) {
-			lines = append(lines, line)
+func changedLines(lines, linesBefore configuration) []string {
+	changed := []string{}
+	for _, line := range sortedKeys(lines) {
+		if lines.changed(linesBefore, line) {
+			changed = append(changed, line)
 		}
+	}
+
+	return changed
+}
+
+func resolveLines(manifests string) configuration {
+	patches := map[string]int{}
+	for manifest := range strings.FieldsSeq(manifests) {
+		match := manifestPattern.FindStringSubmatch(manifest)
+		if match == nil || compareKeys(match[1], minimumLine) < 0 {
+			continue
+		}
+
+		patch, _ := strconv.Atoi(match[2])
+		if current, found := patches[match[1]]; !found || current < patch {
+			patches[match[1]] = patch
+		}
+	}
+
+	lines := configuration{}
+	for line, patch := range patches {
+		lines.set(line, "version", line+"."+strconv.Itoa(patch))
 	}
 
 	return lines
 }
 
-func resolvePins(ctx context.Context, releases map[string]map[string]release, digestsBefore, tagsBefore configuration) (configuration, configuration, error) {
-	digests, tags := configuration{}, configuration{}
-	for line, variants := range releases {
-		for variant, release := range variants {
-			digest, err := fetchDigest(ctx, release.tag, digestsBefore[line][variant])
-			if err != nil {
-				return nil, nil, err
-			}
-
-			tag := release.tag
-			if digest == "" {
-				digest, tag = digestsBefore[line][variant], tagsBefore[line][variant]
-			}
-
-			if digest == "" || tag == "" {
-				continue
-			}
-
-			digests.set(line, variant, digest)
-			tags.set(line, variant, tag)
+func resolveBases(ctx context.Context, basesBefore configuration) (configuration, error) {
+	pins := configuration{}
+	for _, base := range bases {
+		names, err := crane.ListTags(base.repository, dockerHub(ctx)...)
+		if err != nil {
+			return nil, err
 		}
+
+		matching := slices.DeleteFunc(names, func(tag string) bool { return !base.tag.MatchString(tag) })
+		if len(matching) == 0 {
+			return nil, fmt.Errorf("no %s tag in %s matches %s", base.variant, base.repository, base.tag)
+		}
+
+		image := base.repository + ":" + slices.MaxFunc(matching, compareKeys)
+		before := basesBefore[base.variant]
+
+		pinned := ""
+		if before["image"] == image {
+			pinned = before["digest"]
+		}
+
+		digest, err := fetchDigest(ctx, image, pinned)
+		if err != nil {
+			return nil, err
+		}
+
+		if digest == "" {
+			image, digest = before["image"], before["digest"]
+		}
+
+		if digest == "" {
+			return nil, fmt.Errorf("%s has no image for every architecture", image)
+		}
+
+		pins.set(base.variant, "image", image)
+		pins.set(base.variant, "digest", digest)
 	}
 
-	return digests, tags, nil
+	return pins, nil
 }
 
-func resolveReleases(names []string) map[string]map[string]release {
-	releases := map[string]map[string]release{}
-	for _, name := range names {
-		match := releasePattern.FindStringSubmatch(name)
-		if match == nil || compareKeys(match[1], minimumLine) < 0 {
-			continue
-		}
-
-		line, variant := match[1], cmp.Or(match[4], "alpine")
-		patch, _ := strconv.Atoi(match[2])
-		alpine, _ := strconv.Atoi(match[3])
-
-		if releases[line] == nil {
-			releases[line] = map[string]release{}
-		}
-
-		current, found := releases[line][variant]
-		if !found || cmp.Or(cmp.Compare(current.patch, patch), cmp.Compare(current.alpine, alpine)) < 0 {
-			releases[line][variant] = release{patch: patch, alpine: alpine, tag: name}
-		}
-	}
-
-	return releases
-}
-
-func fetchDigest(ctx context.Context, tag, pinned string) (string, error) {
-	head, err := crane.Head(repository+":"+tag, dockerHub(ctx)...)
+func fetchDigest(ctx context.Context, image, pinned string) (string, error) {
+	head, err := crane.Head(image, dockerHub(ctx)...)
 	if err != nil || head.Digest.String() == pinned {
 		return pinned, err
 	}
+
+	repository, _, _ := strings.Cut(image, ":")
 
 	manifest, err := crane.Manifest(repository+"@"+head.Digest.String(), dockerHub(ctx)...)
 	if err != nil {
@@ -235,9 +258,14 @@ func dockerHub(ctx context.Context) []crane.Option {
 func resolveTools(ctx context.Context) (configuration, error) {
 	pins := configuration{}
 	for _, tool := range tools {
-		releases, err := tool.fetchReleases(ctx)
+		content, err := fetch(ctx, "https://api.github.com/repos/"+tool.repository+"/releases", githubHeaders())
 		if err != nil {
 			return nil, err
+		}
+
+		var releases []githubRelease
+		if err := json.Unmarshal(content, &releases); err != nil {
+			return nil, fmt.Errorf("parsing %s releases: %w", tool.repository, err)
 		}
 
 		pin, err := tool.pin(releases)
@@ -246,6 +274,25 @@ func resolveTools(ctx context.Context) (configuration, error) {
 		}
 
 		pins[tool.name] = pin
+	}
+
+	release, err := fetch(ctx, rustupReleaseURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	match := rustupPattern.FindSubmatch(release)
+	if match == nil {
+		return nil, fmt.Errorf("no rustup version in %s", rustupReleaseURL)
+	}
+
+	for _, libc := range []string{"gnu", "musl"} {
+		rustup, err := resolveRustup(ctx, string(match[1]), libc)
+		if err != nil {
+			return nil, err
+		}
+
+		pins["rustup-"+libc] = rustup
 	}
 
 	return pins, nil
@@ -275,15 +322,44 @@ func (tool tool) pin(releases []githubRelease) (map[string]string, error) {
 	return nil, fmt.Errorf("no %s release found in %s", tool.name, tool.repository)
 }
 
-func (tool tool) fetchReleases(ctx context.Context) ([]githubRelease, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+tool.repository+"/releases", nil)
+func resolveRustup(ctx context.Context, version, libc string) (map[string]string, error) {
+	pin := map[string]string{"version": version}
+	for _, architecture := range architectures {
+		url := rustupURL + "/archive/" + version + "/" + triples[architecture] + "-unknown-linux-" + libc + "/rustup-init.sha256"
+
+		checksum, err := fetch(ctx, url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		hash := checksumPattern.FindSubmatch(checksum)
+		if hash == nil {
+			return nil, fmt.Errorf("no sha256 in %s", url)
+		}
+
+		pin[architecture] = "sha256:" + string(hash[1])
+	}
+
+	return pin, nil
+}
+
+func githubHeaders() map[string]string {
+	headers := map[string]string{"Accept": "application/vnd.github+json"}
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		headers["Authorization"] = "Bearer " + token
+	}
+
+	return headers
+}
+
+func fetch(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	request.Header.Set("Accept", "application/vnd.github+json")
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
+	for key, value := range headers {
+		request.Header.Set(key, value)
 	}
 
 	response, err := http.DefaultClient.Do(request)
@@ -293,10 +369,8 @@ func (tool tool) fetchReleases(ctx context.Context) ([]githubRelease, error) {
 	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching %s releases: %s", tool.repository, response.Status)
+		return nil, fmt.Errorf("fetching %s: %s", url, response.Status)
 	}
 
-	var releases []githubRelease
-
-	return releases, json.NewDecoder(response.Body).Decode(&releases)
+	return io.ReadAll(response.Body)
 }

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG RUST_IMAGE=library/rust:alpine
+ARG BASE_IMAGE=library/alpine:3.24
 ARG SYSTEM=alpine
 
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS tools
@@ -14,24 +14,37 @@ ARG CARGO_NEXTEST_SHA256_ARM64
 ARG JUST_VERSION
 ARG JUST_SHA256_AMD64
 ARG JUST_SHA256_ARM64
+ARG RUSTUP_GNU_VERSION
+ARG RUSTUP_GNU_SHA256_AMD64
+ARG RUSTUP_GNU_SHA256_ARM64
+ARG RUSTUP_MUSL_VERSION
+ARG RUSTUP_MUSL_SHA256_AMD64
+ARG RUSTUP_MUSL_SHA256_ARM64
 ARG SCCACHE_VERSION
 ARG SCCACHE_SHA256_AMD64
 ARG SCCACHE_SHA256_ARM64
 
+RUN apk add --no-cache curl
+
 WORKDIR /downloads
 RUN set -eu && \
     case $TARGETARCH in \
-        amd64) triple=x86_64-unknown-linux-musl deny=$CARGO_DENY_SHA256_AMD64 nextest=$CARGO_NEXTEST_SHA256_AMD64 just=$JUST_SHA256_AMD64 sccache=$SCCACHE_SHA256_AMD64 ;; \
-        arm64) triple=aarch64-unknown-linux-musl deny=$CARGO_DENY_SHA256_ARM64 nextest=$CARGO_NEXTEST_SHA256_ARM64 just=$JUST_SHA256_ARM64 sccache=$SCCACHE_SHA256_ARM64 ;; \
+        amd64) triple=x86_64-unknown-linux-musl deny=$CARGO_DENY_SHA256_AMD64 nextest=$CARGO_NEXTEST_SHA256_AMD64 just=$JUST_SHA256_AMD64 gnu=$RUSTUP_GNU_SHA256_AMD64 musl=$RUSTUP_MUSL_SHA256_AMD64 sccache=$SCCACHE_SHA256_AMD64 ;; \
+        arm64) triple=aarch64-unknown-linux-musl deny=$CARGO_DENY_SHA256_ARM64 nextest=$CARGO_NEXTEST_SHA256_ARM64 just=$JUST_SHA256_ARM64 gnu=$RUSTUP_GNU_SHA256_ARM64 musl=$RUSTUP_MUSL_SHA256_ARM64 sccache=$SCCACHE_SHA256_ARM64 ;; \
     esac && \
-    download() { wget -qO archive.tar.gz "$1" && echo "${2#sha256:}  archive.tar.gz" | sha256sum -c -s && tar -xzf archive.tar.gz && rm archive.tar.gz; } && \
-    download "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/cargo-deny-$CARGO_DENY_VERSION-$triple.tar.gz" "$deny" && \
-    download "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$CARGO_NEXTEST_VERSION/cargo-nextest-$CARGO_NEXTEST_VERSION-$triple.tar.gz" "$nextest" && \
-    download "https://github.com/casey/just/releases/download/$JUST_VERSION/just-$JUST_VERSION-$triple.tar.gz" "$just" && \
-    download "https://github.com/mozilla/sccache/releases/download/v$SCCACHE_VERSION/sccache-v$SCCACHE_VERSION-$triple.tar.gz" "$sccache" && \
-    mkdir /out && mv "cargo-deny-$CARGO_DENY_VERSION-$triple/cargo-deny" cargo-nextest just "sccache-v$SCCACHE_VERSION-$triple/sccache" /out/
+    download() { curl -fsSL --retry 5 --retry-all-errors -o "$1" "$2" && echo "${3#sha256:}  $1" | sha256sum -c -s; } && \
+    download cargo-deny.tar.gz "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/cargo-deny-$CARGO_DENY_VERSION-$triple.tar.gz" "$deny" && \
+    download cargo-nextest.tar.gz "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$CARGO_NEXTEST_VERSION/cargo-nextest-$CARGO_NEXTEST_VERSION-$triple.tar.gz" "$nextest" && \
+    download just.tar.gz "https://github.com/casey/just/releases/download/$JUST_VERSION/just-$JUST_VERSION-$triple.tar.gz" "$just" && \
+    download sccache.tar.gz "https://github.com/mozilla/sccache/releases/download/v$SCCACHE_VERSION/sccache-v$SCCACHE_VERSION-$triple.tar.gz" "$sccache" && \
+    download rustup-init-gnu "https://static.rust-lang.org/rustup/archive/$RUSTUP_GNU_VERSION/${triple%-musl}-gnu/rustup-init" "$gnu" && \
+    download rustup-init-musl "https://static.rust-lang.org/rustup/archive/$RUSTUP_MUSL_VERSION/$triple/rustup-init" "$musl" && \
+    for archive in *.tar.gz; do tar -xzf "$archive"; done && \
+    mkdir /out && \
+    mv "cargo-deny-$CARGO_DENY_VERSION-$triple/cargo-deny" cargo-nextest just "sccache-v$SCCACHE_VERSION-$triple/sccache" /out/ && \
+    install -m 755 rustup-init-gnu rustup-init-musl /
 
-FROM ${RUST_IMAGE} AS alpine
+FROM ${BASE_IMAGE} AS alpine
 
 RUN apk add --no-cache \
     build-base \
@@ -44,7 +57,7 @@ RUN apk add --no-cache \
     openssh-client \
     pkgconf
 
-FROM ${RUST_IMAGE} AS debian
+FROM ${BASE_IMAGE} AS debian
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -57,15 +70,14 @@ RUN apt-get update && \
     musl-tools \
     openssh-client \
     pkg-config && \
-    rm -rf /var/lib/apt/lists/* && \
-    rustup target add "$(uname -m)-unknown-linux-musl"
+    rm -rf /var/lib/apt/lists/*
 
 ENV CC_x86_64_unknown_linux_musl=musl-gcc \
     AR_x86_64_unknown_linux_musl=ar \
     CC_aarch64_unknown_linux_musl=musl-gcc \
     AR_aarch64_unknown_linux_musl=ar
 
-FROM ${SYSTEM} AS toolchain
+FROM ${SYSTEM} AS base
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
@@ -73,9 +85,22 @@ ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_INCREMENTAL=0 \
     CARGO_NET_GIT_FETCH_WITH_CLI=true
 
-RUN rustup component add clippy rust-src rustfmt
+RUN --mount=type=bind,from=tools,source=/,target=/tmp/tools \
+    libc=gnu && \
+    if [ -f /etc/alpine-release ]; then libc=musl; fi && \
+    "/tmp/tools/rustup-init-$libc" -y --no-modify-path --profile minimal --default-toolchain none --default-host "$(uname -m)-unknown-linux-$libc"
 
 COPY --from=tools /out/ /usr/local/cargo/bin/
+
+FROM base AS toolchain
+
+ARG RUST_VERSION
+
+RUN set -eu && \
+    targets="" && \
+    if [ ! -f /etc/alpine-release ]; then targets="--target $(uname -m)-unknown-linux-musl"; fi && \
+    rustup toolchain install "$RUST_VERSION" --no-self-update --profile minimal --component clippy,rustfmt,rust-src $targets && \
+    rustup default "$RUST_VERSION"
 
 # smoke tests
 RUN cargo --version && \
@@ -85,6 +110,7 @@ RUN cargo --version && \
     cargo nextest --version && \
     just --version && \
     rustc --version && \
+    rustup --version && \
     sccache --version
 
 FROM toolchain AS smoke

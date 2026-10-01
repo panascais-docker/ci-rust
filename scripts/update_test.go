@@ -9,47 +9,34 @@ import (
 )
 
 func TestChangedLines(t *testing.T) {
-	digestsBefore := configuration{"1.97": {"alpine": "sha256:a"}, "1.98": {"alpine": "sha256:b"}, "1.85": {"bookworm": "sha256:c"}}
-	tagsBefore := configuration{"1.97": {"alpine": "1.97.1-alpine3.24"}, "1.98": {"alpine": "1.98.0-alpine3.24"}, "1.85": {"bookworm": "1.85.1-slim-bookworm"}}
+	linesBefore := configuration{"1.97": {"version": "1.97.1"}, "1.98": {"version": "1.98.0"}, "1.85": {"version": "1.85.1"}}
+	lines := configuration{"1.97": {"version": "1.97.1"}, "1.98": {"version": "1.98.1"}, "1.99": {"version": "1.99.0"}}
 
-	digests := configuration{"1.97": {"alpine": "sha256:a"}, "1.98": {"alpine": "sha256:d"}, "1.99": {"alpine": "sha256:e"}}
-	tags := configuration{"1.97": {"alpine": "1.97.1-alpine3.24"}, "1.98": {"alpine": "1.98.0-alpine3.24"}, "1.99": {"alpine": "1.99.0-alpine3.24"}}
-
-	if lines := changedLines(digests, tags, digestsBefore, tagsBefore); !slices.Equal(lines, []string{"1.98", "1.99"}) {
-		t.Errorf("changedLines() = %v, expected [1.98 1.99]", lines)
+	if changed := changedLines(lines, linesBefore); !slices.Equal(changed, []string{"1.98", "1.99"}) {
+		t.Errorf("changedLines() = %v, expected [1.98 1.99]", changed)
 	}
 
-	if lines := changedLines(digests, tags, digests, tags); lines == nil || len(lines) != 0 {
-		t.Errorf("changedLines() = %#v, expected an empty non-nil slice", lines)
+	if changed := changedLines(lines, lines); changed == nil || len(changed) != 0 {
+		t.Errorf("changedLines() = %#v, expected an empty non-nil slice", changed)
 	}
 }
 
-func TestResolveReleases(t *testing.T) {
-	releases := resolveReleases([]string{
-		"1.84.1-alpine3.21",
-		"1.85.0-alpine3.21",
-		"1.85.1-alpine3.20",
-		"1.85.1-alpine3.21",
-		"1.85.1-slim-bookworm",
-		"1.85.1-bookworm",
-		"1.85.1-slim-bullseye",
-		"1.88.0-slim-trixie",
-		"1.88.0-alpine3.22",
-		"1.88-alpine3.22",
-		"1.88.0-alpine",
-		"1.88.0-slim",
-		"1-alpine3.22",
-		"alpine3.24",
-		"latest",
-	})
+func TestResolveLines(t *testing.T) {
+	lines := resolveLines(strings.Join([]string{
+		"static.rust-lang.org/dist/2025-01-09/channel-rust-1.84.0.toml",
+		"static.rust-lang.org/dist/2025-02-20/channel-rust-1.85.0.toml",
+		"static.rust-lang.org/dist/2025-03-18/channel-rust-1.85.1.toml",
+		"static.rust-lang.org/dist/2025-03-18/channel-rust-1.85.toml",
+		"static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.1.toml",
+		"static.rust-lang.org/dist/2026-09-03/channel-rust-1.98.0.toml",
+		"static.rust-lang.org/dist/2026-09-20/channel-rust-1.99.0-beta.6.toml",
+		"static.rust-lang.org/dist/2026-09-20/channel-rust-1.99.0-beta.toml",
+		"static.rust-lang.org/dist/2026-10-01/channel-rust-stable.toml",
+		"static.rust-lang.org/dist/2026-10-01/channel-rust-nightly.toml",
+	}, "\n"))
 
-	expected := map[string]map[string]release{
-		"1.85": {"alpine": {patch: 1, alpine: 21, tag: "1.85.1-alpine3.21"}, "bookworm": {patch: 1, tag: "1.85.1-slim-bookworm"}},
-		"1.88": {"alpine": {patch: 0, alpine: 22, tag: "1.88.0-alpine3.22"}, "trixie": {patch: 0, tag: "1.88.0-slim-trixie"}},
-	}
-
-	if !maps.EqualFunc(releases, expected, maps.Equal) {
-		t.Errorf("resolveReleases() = %v, expected %v", releases, expected)
+	if expected := (configuration{"1.85": {"version": "1.85.1"}, "1.98": {"version": "1.98.1"}}); !lines.equal(expected) {
+		t.Errorf("resolveLines() = %v, expected %v", lines, expected)
 	}
 }
 

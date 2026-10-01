@@ -22,7 +22,7 @@ jobs:
             - name: read lines
               id: lines
               run: |
-                  echo "lines=$(jq -c 'keys' configuration/tags.json)" >> $GITHUB_OUTPUT
+                  echo "lines=$(jq -c 'keys' configuration/lines.json)" >> $GITHUB_OUTPUT
 
     build:
         name: ${{ matrix.line }} (${{ matrix.architecture }})

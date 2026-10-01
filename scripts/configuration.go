@@ -13,10 +13,9 @@ import (
 )
 
 const (
-	digestsFile = "configuration/digests.json"
-	tagsFile    = "configuration/tags.json"
-	toolsFile   = "configuration/tools.json"
-	repository  = "library/rust"
+	basesFile = "configuration/bases.json"
+	linesFile = "configuration/lines.json"
+	toolsFile = "configuration/tools.json"
 )
 
 type configuration map[string]map[string]string

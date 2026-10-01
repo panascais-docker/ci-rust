@@ -20,12 +20,12 @@ func publishCommand() *cobra.Command {
 }
 
 func publish() error {
-	tags, err := readConfiguration(tagsFile)
+	lines, err := readConfiguration(linesFile)
 	if err != nil {
 		return err
 	}
 
-	digests, err := readConfiguration(digestsFile)
+	basePins, err := readConfiguration(basesFile)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func publish() error {
 		return err
 	}
 
-	creations, err := planManifests(pushed, tags, digests)
+	creations, err := planManifests(pushed, lines, basePins)
 	if err != nil {
 		return err
 	}
@@ -84,21 +84,21 @@ func readPushed() (map[string]configuration, error) {
 	return pushed, nil
 }
 
-func planManifests(pushed map[string]configuration, tags, digests configuration) ([][]string, error) {
-	lines := map[string]bool{}
+func planManifests(pushed map[string]configuration, lines, basePins configuration) ([][]string, error) {
+	built := map[string]bool{}
 	for _, architecture := range architectures {
 		for line := range pushed[architecture] {
-			lines[line] = true
+			built[line] = true
 		}
 	}
 
-	if len(lines) == 0 {
+	if len(built) == 0 {
 		return nil, fmt.Errorf("no pushed digests found in %s", digestsDirectory)
 	}
 
 	var creations [][]string
-	for _, line := range sortedKeys(lines) {
-		builds, err := planBuilds(line, tags, digests)
+	for _, line := range sortedKeys(built) {
+		builds, err := planBuilds(line, lines, basePins)
 		if err != nil {
 			return nil, err
 		}

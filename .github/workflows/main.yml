@@ -1,0 +1,107 @@
+name: main
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: '0 0 * * 0'
+    push:
+        branches:
+            - master
+
+jobs:
+    lines:
+        name: lines
+        if: "!contains(github.event.head_commit.message, '[skip ci]')"
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        outputs:
+            lines: ${{ steps.lines.outputs.lines }}
+        steps:
+            - name: pull repository
+              uses: actions/checkout@v6
+              id: repository
+
+            - name: read lines
+              id: lines
+              run: |
+                  echo "lines=$(jq -c 'keys' configuration/tags.json)" >> $GITHUB_OUTPUT
+
+    deploy:
+        name: ${{ matrix.line }} ${{ matrix.architecture }}
+        needs: [lines]
+        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
+        timeout-minutes: 360
+        strategy:
+            max-parallel: 8
+            matrix:
+                line: ${{ fromJSON(needs.lines.outputs.lines) }}
+                architecture: [amd64, arm64]
+        steps:
+            - name: pull repository
+              uses: actions/checkout@v6
+              id: repository
+
+            - name: setup docker builder
+              uses: docker/setup-buildx-action@v4
+
+            - name: install go
+              id: go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: build and push the docker container image by digest
+              id: build
+              run: |
+                  go run ./scripts build ${{ matrix.line }}
+              env:
+                  CONTAINER_REGISTRY_TOKEN: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
+                  CONTAINER_REGISTRY_USERNAME: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+                  DOCKER_REGISTRY_TOKEN: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+                  DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+                  QUAY_REGISTRY_TOKEN: ${{ secrets.QUAY_REGISTRY_TOKEN }}
+                  QUAY_REGISTRY_USERNAME: ${{ secrets.QUAY_REGISTRY_USERNAME }}
+
+            - name: upload the pushed digests
+              uses: actions/upload-artifact@v7
+              with:
+                  name: digests-${{ matrix.line }}-${{ matrix.architecture }}
+                  path: digests/
+                  if-no-files-found: error
+
+    merge:
+        name: merge
+        needs: [deploy]
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        steps:
+            - name: pull repository
+              uses: actions/checkout@v6
+              id: repository
+
+            - name: setup docker builder
+              uses: docker/setup-buildx-action@v4
+
+            - name: install go
+              id: go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: download the pushed digests
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: digests-*
+                  path: digests/
+                  merge-multiple: true
+
+            - name: tag the multi-platform docker container images
+              id: merge
+              run: |
+                  go run ./scripts merge
+              env:
+                  CONTAINER_REGISTRY_TOKEN: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
+                  CONTAINER_REGISTRY_USERNAME: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+                  DOCKER_REGISTRY_TOKEN: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+                  DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+                  QUAY_REGISTRY_TOKEN: ${{ secrets.QUAY_REGISTRY_TOKEN }}
+                  QUAY_REGISTRY_USERNAME: ${{ secrets.QUAY_REGISTRY_USERNAME }}

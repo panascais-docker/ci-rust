@@ -1,0 +1,22 @@
+{
+    "cargo-deny": {
+        "amd64": "sha256:9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f",
+        "arm64": "sha256:995c82be0defc7a025cae49a2aa2644ce8245c9a3318fc4103907c6a285e8c7d",
+        "version": "0.20.2"
+    },
+    "cargo-nextest": {
+        "amd64": "sha256:b64617e8640624e8f9ba99819e37d7971154e97836d7ae4774fed4715501a6aa",
+        "arm64": "sha256:62ae8b4ad034704f67417f8ed8b897566d82359ab44952729b925fb37eeb7622",
+        "version": "0.9.146"
+    },
+    "just": {
+        "amd64": "sha256:4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
+        "arm64": "sha256:748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df",
+        "version": "1.58.0"
+    },
+    "sccache": {
+        "amd64": "sha256:45f1447fbe231e3037bde351ef70677dd212216c8d62ae7ca409fecc4d6acc89",
+        "arm64": "sha256:2b3284d5da3b46a47dc4229e75bb7b88ac4aa99c8d754fb7d2f84997e5a4354a",
+        "version": "0.18.0"
+    }
+}

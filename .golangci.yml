@@ -1,0 +1,17 @@
+version: '2'
+
+formatters:
+    enable:
+        - gofmt
+        - gci
+    settings:
+        gci:
+            custom-order: true
+            sections:
+                - standard
+                - prefix(golang.org)
+                - prefix(google.golang.org)
+                - prefix(github.com)
+                - prefix(go.uber.org)
+                - default
+                - localmodule

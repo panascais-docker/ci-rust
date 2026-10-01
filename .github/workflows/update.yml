@@ -4,12 +4,14 @@ on:
     schedule:
         - cron: '0,30 * * * *'
 
+concurrency:
+    group: ci-rust
+    cancel-in-progress: false
+
 jobs:
     update:
         name: update
         runs-on: blacksmith-2vcpu-ubuntu-2404
-        outputs:
-            lines: ${{ steps.update.outputs.lines }}
         steps:
             - name: pull repository
               id: repository
@@ -25,8 +27,7 @@ jobs:
             - name: run update script
               id: update
               run: |
-                  lines=$(go run ./scripts update)
-                  echo "lines=$lines" >> $GITHUB_OUTPUT
+                  go run ./scripts update
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -45,17 +46,99 @@ jobs:
                     git push origin master
                   fi
 
-    build:
-        name: ${{ matrix.line }} (${{ matrix.architecture }})
+    plan:
+        name: plan
         needs: [update]
-        if: needs.update.outputs.lines != '[]'
+        runs-on: blacksmith-2vcpu-ubuntu-2404
+        outputs:
+            bases: ${{ steps.plan.outputs.bases }}
+            lines: ${{ steps.plan.outputs.lines }}
+        steps:
+            - name: pull repository
+              uses: actions/checkout@v6
+              id: repository
+
+            - name: setup docker builder
+              uses: docker/setup-buildx-action@v4
+
+            - name: update repository
+              id: update-repository
+              run: |
+                  git pull origin master
+
+            - name: install go
+              id: go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: plan the stale bases and lines
+              id: plan
+              run: |
+                  go run ./scripts plan >> $GITHUB_OUTPUT
+              env:
+                  CONTAINER_REGISTRY_TOKEN: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
+                  CONTAINER_REGISTRY_USERNAME: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+                  DOCKER_REGISTRY_TOKEN: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+                  DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+                  QUAY_REGISTRY_TOKEN: ${{ secrets.QUAY_REGISTRY_TOKEN }}
+                  QUAY_REGISTRY_USERNAME: ${{ secrets.QUAY_REGISTRY_USERNAME }}
+
+    base:
+        name: base ${{ matrix.variant }} (${{ matrix.architecture }})
+        needs: [plan]
+        if: needs.plan.outputs.bases != '[]'
         runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
         timeout-minutes: 360
         strategy:
+            fail-fast: false
+            matrix:
+                include: ${{ fromJSON(needs.plan.outputs.bases) }}
+        steps:
+            - name: pull repository
+              uses: actions/checkout@v6
+              id: repository
+
+            - name: setup docker builder
+              uses: docker/setup-buildx-action@v4
+
+            - name: update repository
+              id: update-repository
+              run: |
+                  git pull origin master
+
+            - name: install go
+              id: go
+              uses: actions/setup-go@v6
+              with:
+                  go-version-file: go.mod
+                  cache: true
+
+            - name: build and push the shared base image
+              id: base
+              run: |
+                  go run ./scripts base ${{ matrix.variant }}
+              env:
+                  CONTAINER_REGISTRY_TOKEN: ${{ secrets.CONTAINER_REGISTRY_TOKEN }}
+                  CONTAINER_REGISTRY_USERNAME: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+                  DOCKER_REGISTRY_TOKEN: ${{ secrets.DOCKER_REGISTRY_TOKEN }}
+                  DOCKER_REGISTRY_USERNAME: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+                  QUAY_REGISTRY_TOKEN: ${{ secrets.QUAY_REGISTRY_TOKEN }}
+                  QUAY_REGISTRY_USERNAME: ${{ secrets.QUAY_REGISTRY_USERNAME }}
+
+    build:
+        name: ${{ matrix.line }} (${{ matrix.architecture }})
+        needs: [plan, base]
+        if: ${{ !failure() && !cancelled() && needs.plan.outputs.lines != '[]' }}
+        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
+        timeout-minutes: 360
+        strategy:
+            fail-fast: false
             max-parallel: 8
             matrix:
+                line: ${{ fromJSON(needs.plan.outputs.lines) }}
                 architecture: [amd64, arm64]
-                line: ${{ fromJSON(needs.update.outputs.lines) }}
         steps:
             - name: pull repository
               uses: actions/checkout@v6
@@ -97,7 +180,8 @@ jobs:
 
     publish:
         name: publish
-        needs: [build]
+        needs: [plan, build]
+        if: ${{ !failure() && !cancelled() && needs.plan.outputs.lines != '[]' }}
         runs-on: blacksmith-2vcpu-ubuntu-2404
         steps:
             - name: pull repository

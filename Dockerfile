@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 ARG BASE_IMAGE=library/alpine:3.24
 ARG SYSTEM=alpine
+ARG TOOLCHAIN_BASE=base
 
 FROM --platform=$BUILDPLATFORM alpine:3.24 AS tools
 
@@ -92,7 +93,11 @@ RUN --mount=type=bind,from=tools,source=/,target=/tmp/tools \
 
 COPY --from=tools /out/ /usr/local/cargo/bin/
 
-FROM base AS toolchain
+ARG BASE_FINGERPRINT
+
+LABEL org.panascais.ci-rust.base-fingerprint=$BASE_FINGERPRINT
+
+FROM ${TOOLCHAIN_BASE} AS toolchain
 
 ARG RUST_VERSION
 

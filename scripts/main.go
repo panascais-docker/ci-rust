@@ -12,7 +12,7 @@ func main() {
 		Short:        "Build panascais/ci-rust images and update their configuration",
 		SilenceUsage: true,
 	}
-	command.AddCommand(buildCommand(), publishCommand(), updateCommand())
+	command.AddCommand(baseCommand(), buildCommand(), planCommand(), publishCommand(), updateCommand())
 	command.CompletionOptions.DisableDefaultCmd = true
 
 	if command.Execute() != nil {

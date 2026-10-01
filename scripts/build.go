@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -35,11 +36,12 @@ var registries = []registry{
 }
 
 type build struct {
-	line    string
-	variant string
-	base    string
-	version string
-	names   []string
+	line          string
+	variant       string
+	base          string
+	version       string
+	names         []string
+	toolchainBase string
 }
 
 type bakeFile struct {
@@ -69,14 +71,16 @@ func buildCommand() *cobra.Command {
 		Use:   "build <line>",
 		Short: "Smoke test and build every variant of a line, pushing by digest on GitHub Actions and loading locally",
 		Args:  cobra.ExactArgs(1),
-		RunE:  func(_ *cobra.Command, arguments []string) error { return buildLine(arguments[0], platform) },
+		RunE: func(command *cobra.Command, arguments []string) error {
+			return buildLine(command.Context(), arguments[0], platform)
+		},
 	}
 	command.Flags().StringVar(&platform, "platform", "linux/"+runtime.GOARCH, "platform to smoke test and build")
 
 	return command
 }
 
-func buildLine(line, platform string) error {
+func buildLine(ctx context.Context, line, platform string) error {
 	lines, err := readConfiguration(linesFile)
 	if err != nil {
 		return err
@@ -109,6 +113,16 @@ func buildLine(line, platform string) error {
 			if err := registry.login(); err != nil {
 				return err
 			}
+		}
+
+		_, architecture, _ := strings.Cut(platform, "/")
+		for index, build := range builds {
+			digest, _, err := fetchBase(ctx, build.variant, architecture)
+			if err != nil {
+				return err
+			}
+
+			builds[index].toolchainBase = baseImage + "@" + digest
 		}
 	}
 
@@ -313,6 +327,9 @@ func bakeDefinition(builds []build, arguments map[string]string, platform, stage
 		args["BASE_IMAGE"] = build.base
 		args["RUST_VERSION"] = build.version
 		args["SYSTEM"] = build.system()
+		if build.toolchainBase != "" {
+			args["TOOLCHAIN_BASE"] = build.toolchainBase
+		}
 
 		tags, outputs := export(build)
 		targets[build.target()] = bakeTarget{
@@ -338,6 +355,7 @@ func (registry registry) login() error {
 	}
 
 	login := command("docker", append(arguments, "-u", os.Getenv(registry.secrets+"_REGISTRY_USERNAME"), "--password-stdin")...)
+	login.Stdout = os.Stderr
 	login.Stdin = strings.NewReader(os.Getenv(registry.secrets + "_REGISTRY_TOKEN"))
 
 	return login.Run()

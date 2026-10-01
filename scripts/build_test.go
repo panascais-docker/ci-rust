@@ -54,11 +54,12 @@ func TestPlanManifests(t *testing.T) {
 	digest := func(character string) string { return "sha256:" + strings.Repeat(character, 64) }
 	lines := configuration{"1.98": {"version": "1.98.1"}}
 	basePins := configuration{"alpine": {"image": "library/alpine:3.24", "digest": digest("a")}}
+	fingerprints := configuration{"1.98": {"alpine": digest("d")}}
 
 	creations, err := planManifests(map[string]configuration{
 		"amd64": {"1.98": {"alpine": digest("b")}},
 		"arm64": {"1.98": {"alpine": digest("c")}},
-	}, lines, basePins)
+	}, lines, basePins, fingerprints)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +70,7 @@ func TestPlanManifests(t *testing.T) {
 
 	expected := []string{
 		"buildx", "imagetools", "create",
+		"--annotation", "index:org.panascais.ci-rust.fingerprint=" + digest("d"),
 		"--tag", "quay.io/panascais/ci-rust:1.98-alpine",
 		"--tag", "quay.io/panascais/ci-rust:1.98.1-alpine",
 		"--tag", "quay.io/panascais/ci-rust:1-alpine",
@@ -84,7 +86,14 @@ func TestPlanManifests(t *testing.T) {
 		t.Errorf("planManifests() = %q, expected %q", creations[2], expected)
 	}
 
-	if _, err := planManifests(map[string]configuration{"amd64": {"1.98": {"alpine": digest("b")}}}, lines, basePins); err == nil {
+	if _, err := planManifests(map[string]configuration{"amd64": {"1.98": {"alpine": digest("b")}}}, lines, basePins, fingerprints); err == nil {
 		t.Error("planManifests() without an arm64 digest succeeded, expected an error")
+	}
+
+	if _, err := planManifests(map[string]configuration{
+		"amd64": {"1.98": {"alpine": digest("b")}},
+		"arm64": {"1.98": {"alpine": digest("c")}},
+	}, lines, basePins, configuration{}); err == nil {
+		t.Error("planManifests() without a fingerprint succeeded, expected an error")
 	}
 }

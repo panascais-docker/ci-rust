@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -15,17 +16,12 @@ func publishCommand() *cobra.Command {
 		Use:   "publish",
 		Short: "Tag the pushed amd64 and arm64 digests of every built line as multi-platform images",
 		Args:  cobra.NoArgs,
-		RunE:  func(_ *cobra.Command, _ []string) error { return publish() },
+		RunE:  func(command *cobra.Command, _ []string) error { return publish(command.Context()) },
 	}
 }
 
-func publish() error {
-	lines, err := readConfiguration(linesFile)
-	if err != nil {
-		return err
-	}
-
-	basePins, err := readConfiguration(basesFile)
+func publish(ctx context.Context) error {
+	sources, err := readSources()
 	if err != nil {
 		return err
 	}
@@ -35,15 +31,20 @@ func publish() error {
 		return err
 	}
 
-	creations, err := planManifests(pushed, lines, basePins)
-	if err != nil {
-		return err
-	}
-
 	for _, registry := range registries {
 		if err := registry.login(); err != nil {
 			return err
 		}
+	}
+
+	baseDigests, err := fetchBaseDigests(ctx, sortedKeys(sources.basePins))
+	if err != nil {
+		return err
+	}
+
+	creations, err := planManifests(pushed, sources.lines, sources.basePins, lineFingerprints(sources, baseDigests))
+	if err != nil {
+		return err
 	}
 
 	errs := make([]error, len(creations))
@@ -84,7 +85,7 @@ func readPushed() (map[string]configuration, error) {
 	return pushed, nil
 }
 
-func planManifests(pushed map[string]configuration, lines, basePins configuration) ([][]string, error) {
+func planManifests(pushed map[string]configuration, lines, basePins, fingerprints configuration) ([][]string, error) {
 	built := map[string]bool{}
 	for _, architecture := range architectures {
 		for line := range pushed[architecture] {
@@ -104,6 +105,11 @@ func planManifests(pushed map[string]configuration, lines, basePins configuratio
 		}
 
 		for _, build := range builds {
+			fingerprint := fingerprints[line][build.variant]
+			if fingerprint == "" {
+				return nil, fmt.Errorf("no fingerprint for %s", build.target())
+			}
+
 			var sources []string
 			for _, architecture := range architectures {
 				digest := pushed[architecture][line][build.variant]
@@ -115,7 +121,7 @@ func planManifests(pushed map[string]configuration, lines, basePins configuratio
 			}
 
 			for _, registry := range registries {
-				creation := []string{"buildx", "imagetools", "create"}
+				creation := []string{"buildx", "imagetools", "create", "--annotation", "index:" + lineAnnotation + "=" + fingerprint}
 				for _, tag := range build.tags(registry) {
 					creation = append(creation, "--tag", tag)
 				}

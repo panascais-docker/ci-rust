@@ -89,7 +89,7 @@ jobs:
         name: base ${{ matrix.variant }} (${{ matrix.architecture }})
         needs: [plan]
         if: needs.plan.outputs.bases != '[]'
-        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
+        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-4vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
         timeout-minutes: 360
         strategy:
             fail-fast: false
@@ -131,7 +131,7 @@ jobs:
         name: ${{ matrix.line }} (${{ matrix.architecture }})
         needs: [plan, base]
         if: ${{ !failure() && !cancelled() && needs.plan.outputs.lines != '[]' }}
-        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-2vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
+        runs-on: ${{ matrix.architecture == 'arm64' && 'blacksmith-4vcpu-ubuntu-2404-arm' || 'blacksmith-2vcpu-ubuntu-2404' }}
         timeout-minutes: 360
         strategy:
             fail-fast: false

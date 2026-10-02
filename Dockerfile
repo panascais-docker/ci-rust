@@ -136,7 +136,7 @@ RUN set -eu && \
     cargo build --locked --release --target "$target" && \
     sccache --show-stats > /tmp/sccache-stats && \
     grep -Eq '^Cache hits +[1-9]' /tmp/sccache-stats && \
-    cargo nextest run --locked --target "$target"
+    cargo nextest run --locked --release --target "$target"
 
 FROM toolchain AS image
 

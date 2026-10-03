@@ -95,7 +95,7 @@ COPY --from=tools /out/ /usr/local/cargo/bin/
 
 ARG BASE_FINGERPRINT
 
-LABEL org.panascais.ci-rust.base-fingerprint=$BASE_FINGERPRINT
+LABEL net.panascais.docker.ci-rust.base-fingerprint=$BASE_FINGERPRINT
 
 FROM ${TOOLCHAIN_BASE} AS toolchain
 

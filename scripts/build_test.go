@@ -70,7 +70,7 @@ func TestPlanManifests(t *testing.T) {
 
 	expected := []string{
 		"buildx", "imagetools", "create",
-		"--annotation", "index:org.panascais.ci-rust.fingerprint=" + digest("d"),
+		"--annotation", "index:net.panascais.docker.ci-rust.fingerprint=" + digest("d"),
 		"--tag", "quay.io/panascais/ci-rust:1.98-alpine",
 		"--tag", "quay.io/panascais/ci-rust:1.98.1-alpine",
 		"--tag", "quay.io/panascais/ci-rust:1-alpine",

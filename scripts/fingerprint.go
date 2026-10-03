@@ -14,8 +14,8 @@ import (
 const (
 	dockerfile       = "Dockerfile"
 	smokeDirectory   = "smoke"
-	baseLabel        = "org.panascais.ci-rust.base-fingerprint"
-	lineAnnotation   = "org.panascais.ci-rust.fingerprint"
+	baseLabel        = "net.panascais.docker.ci-rust.base-fingerprint"
+	lineAnnotation   = "net.panascais.docker.ci-rust.fingerprint"
 	targetsDirectory = "target"
 )
 

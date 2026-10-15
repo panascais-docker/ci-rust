@@ -10,9 +10,9 @@
         "version": "0.9.148"
     },
     "just": {
-        "amd64": "sha256:4a5cc2f53e6f0f8c59092a6cc38291eb729d46a7dd95d3ae582008881b84931d",
-        "arm64": "sha256:748237128c4c40cbdabc65e841d05ceba13cc23a91eaba395495894c1d9764df",
-        "version": "1.58.0"
+        "amd64": "sha256:409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e",
+        "arm64": "sha256:23871b1702bfd550fb5f901778fd4290ecf2ee034a45a889fbe96d89b188086d",
+        "version": "1.59.0"
     },
     "rustup-gnu": {
         "amd64": "sha256:dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71",

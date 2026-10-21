@@ -15,14 +15,14 @@
         "version": "1.59.0"
     },
     "rustup-gnu": {
-        "amd64": "sha256:dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71",
-        "arm64": "sha256:15f6e4ce9f583b929c996c91562bad6d4454f3281de858b02cdfdef615fac433",
-        "version": "1.29.1"
+        "amd64": "sha256:5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4",
+        "arm64": "sha256:a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697",
+        "version": "1.29.2"
     },
     "rustup-musl": {
-        "amd64": "sha256:331228566cc931f32cd684f9bebc5956a5e5d7394c8d5de595f196a658ab98e6",
-        "arm64": "sha256:1ddf36182ac5d1782dbeefcb9bea7f5f9412d88f4a0d5047b1564a223624e8c6",
-        "version": "1.29.1"
+        "amd64": "sha256:2ba97d668c06dc4b1884f2a3fa6f4cf14b9bd0c1db379af7e4f87a705ff19edd",
+        "arm64": "sha256:7fdbb23acf6495efee2e371580c52b365917551b4835090a225c44ac30915235",
+        "version": "1.29.2"
     },
     "sccache": {
         "amd64": "sha256:45f1447fbe231e3037bde351ef70677dd212216c8d62ae7ca409fecc4d6acc89",

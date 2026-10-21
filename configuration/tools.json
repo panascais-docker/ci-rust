@@ -5,9 +5,9 @@
         "version": "0.20.2"
     },
     "cargo-nextest": {
-        "amd64": "sha256:bf92cb81450872d960ffa13857a83084d557ec0cdc141663d263bb23ef756f97",
-        "arm64": "sha256:94676506ceaed01746d78cfe9ed124ee841b2932fd18d9d10f438a347bd9ba5e",
-        "version": "0.9.148"
+        "amd64": "sha256:d65c7f14bcb5c1566d1ecd534c5da8dedb81ba58586e478b0ab81c877d2bd8ad",
+        "arm64": "sha256:533c9b431c2bb1dcb216e02e474263db0cdcd556373b72cc34830fb417058a6b",
+        "version": "0.9.149"
     },
     "just": {
         "amd64": "sha256:409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e",

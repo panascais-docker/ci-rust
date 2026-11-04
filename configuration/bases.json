@@ -1,10 +1,10 @@
 {
     "alpine": {
         "digest": "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
-        "image": "library/alpine:3.24"
+        "image": "mirror.gcr.io/library/alpine:3.24"
     },
     "trixie": {
         "digest": "sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4",
-        "image": "library/debian:trixie-slim"
+        "image": "mirror.gcr.io/library/debian:trixie-slim"
     }
 }

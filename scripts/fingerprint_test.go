@@ -15,14 +15,14 @@ func TestFingerprint(t *testing.T) {
 
 func TestBaseFingerprint(t *testing.T) {
 	sources := sources{
-		basePins:   configuration{"alpine": {"image": "library/alpine:3.24", "digest": "sha256:a"}},
+		basePins:   configuration{"alpine": {"image": "mirror.gcr.io/library/alpine:3.24", "digest": "sha256:a"}},
 		toolPins:   configuration{"just": {"version": "1.58.0", "amd64": "sha256:b", "arm64": "sha256:c"}},
 		dockerfile: "sha256:d",
 	}
 
 	expected := fingerprint(map[string]string{
 		"architecture": "arm64",
-		"base":         "library/alpine:3.24@sha256:a",
+		"base":         "mirror.gcr.io/library/alpine:3.24@sha256:a",
 		"dockerfile":   "sha256:d",
 		"just.version": "1.58.0",
 		"just.amd64":   "sha256:b",

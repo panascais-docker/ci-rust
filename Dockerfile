@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1
-ARG BASE_IMAGE=library/alpine:3.24
+# syntax=mirror.gcr.io/docker/dockerfile:1
+ARG BASE_IMAGE=mirror.gcr.io/library/alpine:3.24
 ARG SYSTEM=alpine
 ARG TOOLCHAIN_BASE=base
 
-FROM --platform=$BUILDPLATFORM alpine:3.24 AS tools
+FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/alpine:3.24 AS tools
 
 ARG TARGETARCH
 ARG CARGO_DENY_VERSION

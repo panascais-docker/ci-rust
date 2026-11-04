@@ -21,7 +21,8 @@ jobs:
               id: go
               uses: actions/setup-go@v6
               with:
-                  go-version-file: go.mod
+                  go-version: stable
+                  check-latest: true
                   cache: true
 
             - name: run update script
@@ -60,6 +61,8 @@ jobs:
 
             - name: setup docker builder
               uses: docker/setup-buildx-action@v4
+              with:
+                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
 
             - name: update repository
               id: update-repository
@@ -70,7 +73,8 @@ jobs:
               id: go
               uses: actions/setup-go@v6
               with:
-                  go-version-file: go.mod
+                  go-version: stable
+                  check-latest: true
                   cache: true
 
             - name: plan the stale bases and lines
@@ -102,6 +106,8 @@ jobs:
 
             - name: setup docker builder
               uses: docker/setup-buildx-action@v4
+              with:
+                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
 
             - name: update repository
               id: update-repository
@@ -112,7 +118,8 @@ jobs:
               id: go
               uses: actions/setup-go@v6
               with:
-                  go-version-file: go.mod
+                  go-version: stable
+                  check-latest: true
                   cache: true
 
             - name: build and push the shared base image
@@ -146,6 +153,8 @@ jobs:
 
             - name: setup docker builder
               uses: docker/setup-buildx-action@v4
+              with:
+                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
 
             - name: update repository
               id: update-repository
@@ -156,7 +165,8 @@ jobs:
               id: go
               uses: actions/setup-go@v6
               with:
-                  go-version-file: go.mod
+                  go-version: stable
+                  check-latest: true
                   cache: true
 
             - name: build and push the docker container image by digest
@@ -190,6 +200,8 @@ jobs:
 
             - name: setup docker builder
               uses: docker/setup-buildx-action@v4
+              with:
+                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
 
             - name: update repository
               id: update-repository
@@ -200,7 +212,8 @@ jobs:
               id: go
               uses: actions/setup-go@v6
               with:
-                  go-version-file: go.mod
+                  go-version: stable
+                  check-latest: true
                   cache: true
 
             - name: download the pushed digests

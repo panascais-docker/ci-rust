@@ -36,8 +36,8 @@ var (
 	rustupPattern   = regexp.MustCompile(`(?m)^version = '(\d+\.\d+\.\d+)'$`)
 	checksumPattern = regexp.MustCompile(`^([0-9a-f]{64})\s`)
 	bases           = []base{
-		{variant: "alpine", repository: "library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
-		{variant: "trixie", repository: "library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
+		{variant: "alpine", repository: "mirror.gcr.io/library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
+		{variant: "trixie", repository: "mirror.gcr.io/library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
 	}
 	tools = []tool{
 		{name: "cargo-deny", repository: "EmbarkStudios/cargo-deny", release: regexp.MustCompile(`^(\d+\.\d+\.\d+)$`), asset: "cargo-deny-%s-%s-unknown-linux-musl.tar.gz"},
@@ -203,7 +203,7 @@ func resolveLines(manifests string) configuration {
 func resolveBases(ctx context.Context, basesBefore configuration) (configuration, error) {
 	pins := configuration{}
 	for _, base := range bases {
-		names, err := crane.ListTags(base.repository, dockerHub(ctx)...)
+		names, err := upstreamTags(ctx, base.repository)
 		if err != nil {
 			return nil, err
 		}
@@ -242,14 +242,18 @@ func resolveBases(ctx context.Context, basesBefore configuration) (configuration
 }
 
 func fetchDigest(ctx context.Context, image, pinned string) (string, error) {
-	head, err := crane.Head(image, dockerHub(ctx)...)
+	head, err := crane.Head(image, registryOptions(ctx)...)
+	if missing(err) {
+		return "", nil
+	}
+
 	if err != nil || head.Digest.String() == pinned {
 		return pinned, err
 	}
 
 	repository, _, _ := strings.Cut(image, ":")
 
-	manifest, err := crane.Manifest(repository+"@"+head.Digest.String(), dockerHub(ctx)...)
+	manifest, err := crane.Manifest(repository+"@"+head.Digest.String(), registryOptions(ctx)...)
 	if err != nil {
 		return "", err
 	}
@@ -270,9 +274,15 @@ func fetchDigest(ctx context.Context, image, pinned string) (string, error) {
 	return head.Digest.String(), nil
 }
 
-func dockerHub(ctx context.Context) []crane.Option {
-	return []crane.Option{crane.WithContext(ctx), func(options *crane.Options) {
+// listing tags is not a pull, and docker hub shows new releases before the mirror has cached them
+func upstreamTags(ctx context.Context, repository string) ([]string, error) {
+	return crane.ListTags(strings.TrimPrefix(repository, "mirror.gcr.io/"), append(registryOptions(ctx), func(options *crane.Options) {
 		options.Name = append(options.Name, name.WithDefaultRegistry("registry-1.docker.io"))
+	})...)
+}
+
+func registryOptions(ctx context.Context) []crane.Option {
+	return []crane.Option{crane.WithContext(ctx), func(options *crane.Options) {
 		options.Remote = append(options.Remote, remote.WithPageSize(1_000_000))
 	}}
 }

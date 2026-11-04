@@ -26,14 +26,14 @@ func TestResolveNames(t *testing.T) {
 
 func TestPlanBuilds(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
-	basePins := configuration{"alpine": {"image": "library/alpine:3.24", "digest": digest}, "trixie": {"image": "library/debian:trixie-slim", "digest": digest}}
+	basePins := configuration{"alpine": {"image": "mirror.gcr.io/library/alpine:3.24", "digest": digest}, "trixie": {"image": "mirror.gcr.io/library/debian:trixie-slim", "digest": digest}}
 
 	builds, err := planBuilds("1.98", configuration{"1.98": {"version": "1.98.1"}}, basePins)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(builds) != 2 || builds[1].variant != "trixie" || builds[1].base != "library/debian:trixie-slim@"+digest || builds[1].version != "1.98.1" {
+	if len(builds) != 2 || builds[1].variant != "trixie" || builds[1].base != "mirror.gcr.io/library/debian:trixie-slim@"+digest || builds[1].version != "1.98.1" {
 		t.Errorf("planBuilds() = %+v", builds)
 	}
 
@@ -41,7 +41,7 @@ func TestPlanBuilds(t *testing.T) {
 		lines, basePins configuration
 	}{
 		{configuration{"1.98": {"version": "1.97.1"}}, basePins},
-		{configuration{"1.98": {"version": "1.98.1"}}, configuration{"alpine": {"image": "library/alpine:3.24", "digest": "latest"}}},
+		{configuration{"1.98": {"version": "1.98.1"}}, configuration{"alpine": {"image": "mirror.gcr.io/library/alpine:3.24", "digest": "latest"}}},
 		{configuration{"1.97": {"version": "1.97.1"}}, basePins},
 	} {
 		if _, err := planBuilds("1.98", testCase.lines, testCase.basePins); err == nil {
@@ -53,7 +53,7 @@ func TestPlanBuilds(t *testing.T) {
 func TestPlanManifests(t *testing.T) {
 	digest := func(character string) string { return "sha256:" + strings.Repeat(character, 64) }
 	lines := configuration{"1.98": {"version": "1.98.1"}}
-	basePins := configuration{"alpine": {"image": "library/alpine:3.24", "digest": digest("a")}}
+	basePins := configuration{"alpine": {"image": "mirror.gcr.io/library/alpine:3.24", "digest": digest("a")}}
 	fingerprints := configuration{"1.98": {"alpine": digest("d")}}
 
 	creations, err := planManifests(map[string]configuration{

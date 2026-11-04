@@ -6,7 +6,7 @@
 [![Docker Image Size](https://img.shields.io/docker/image-size/panascais/ci-rust.svg?style=flat-square)](https://hub.docker.com/r/panascais/ci-rust)
 [![License](https://img.shields.io/github/license/panascais-docker/ci-rust.svg?style=flat-square)](https://hub.docker.com/r/panascais/ci-rust)
 
-Rust CI images for `linux/amd64` and `linux/arm64`. Each image installs the toolchain with [`rustup`](https://rustup.rs) on alpine 3.24 or Debian trixie. They come with `cargo nextest`, `cargo deny`, `just` and `sccache`, and `cargo build --target <arch>-unknown-linux-musl` produces a static binary without extra setup.
+Rust CI images for `linux/amd64` and `linux/arm64`. Each image installs the toolchain with [`rustup`](https://rustup.rs) on alpine 3.24 or Debian trixie. They come with `cargo nextest`, `cargo deny`, `cargo zigbuild`, `just`, `sccache` and `zig`, and `cargo build --target <arch>-unknown-linux-musl` produces a static binary without extra setup.
 
 | **Tag:**      | **Command:**                           | **Rust Version:** | **Variants:**                 |
 | ------------- | -------------------------------------- | ----------------- | ----------------------------- |
@@ -37,15 +37,17 @@ For example `1.98` and `1.98-alpine` are Rust 1.98 on alpine, `1.98.1-trixie` is
 
 ## Included tools
 
-| **Name:**       | **GitHub:**                                                                      |
-| --------------- | -------------------------------------------------------------------------------- |
-| `cargo-deny`    | [github.com/EmbarkStudios/cargo-deny](https://github.com/EmbarkStudios/cargo-deny) |
-| `cargo-nextest` | [github.com/nextest-rs/nextest](https://github.com/nextest-rs/nextest)           |
-| `just`          | [github.com/casey/just](https://github.com/casey/just)                           |
-| `rustup`        | [github.com/rust-lang/rustup](https://github.com/rust-lang/rustup)               |
-| `sccache`       | [github.com/mozilla/sccache](https://github.com/mozilla/sccache)                 |
+| **Name:**        | **Source:**                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| `cargo-deny`     | [github.com/EmbarkStudios/cargo-deny](https://github.com/EmbarkStudios/cargo-deny)   |
+| `cargo-nextest`  | [github.com/nextest-rs/nextest](https://github.com/nextest-rs/nextest)               |
+| `cargo-zigbuild` | [github.com/rust-cross/cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild) |
+| `just`           | [github.com/casey/just](https://github.com/casey/just)                               |
+| `rustup`         | [github.com/rust-lang/rustup](https://github.com/rust-lang/rustup)                   |
+| `sccache`        | [github.com/mozilla/sccache](https://github.com/mozilla/sccache)                     |
+| `zig`            | [codeberg.org/ziglang/zig](https://codeberg.org/ziglang/zig)                         |
 
-The tools are release binaries in `/usr/local/cargo/bin`, each checked against a pinned sha256. `rustup` installs the toolchain with `clippy`, `rustfmt` and `rust-src`. For crates that compile C, like `ring`, `aws-lc-sys` or `zstd-sys`, there is a C toolchain with `clang`, `cmake` and `pkg-config`. `git`, `curl` and `openssh-client` cover git dependencies.
+The tools are release binaries in `/usr/local/cargo/bin`, each checked against a pinned sha256. `cargo-zigbuild` and `zig` come from their official PyPI wheels, with the `zig` standard library in `/usr/local/zig`. `rustup` installs the toolchain with `clippy`, `rustfmt` and `rust-src`. For crates that compile C, like `ring`, `aws-lc-sys` or `zstd-sys`, there is a C toolchain with `clang`, `cmake` and `pkg-config`. `git`, `curl` and `openssh-client` cover git dependencies.
 
 There is no `libssl-dev`, so crates have to use rustls. There is no Docker CLI either, because testcontainers talks to the Docker socket directly.
 
@@ -67,7 +69,15 @@ The images run as root and have no entrypoint. They set `RUSTUP_HOME=/usr/local/
 cargo build --release --target "$(uname -m)-unknown-linux-musl"
 ```
 
-The result has no dynamic loader and runs in a `FROM scratch` image. On alpine musl is the host target. The Debian variants add the musl target and point `CC_<target>` and `AR_<target>` at `musl-gcc` and `ar`, so crates that compile C build for musl as well.
+The result has no dynamic loader and runs in a `FROM scratch` image. On alpine musl is the host target. The Debian variants point `CC_<target>` and `AR_<target>` of the host musl target at `musl-gcc` and `ar`, so crates that compile C build for musl as well.
+
+### Cross compiling
+
+```sh
+cargo zigbuild --release --target aarch64-unknown-linux-musl
+```
+
+Every variant installs the musl targets for both `x86_64` and `aarch64`, so an amd64 runner builds static arm64 binaries and the other way round. `cargo zigbuild` points the C compiler and linker of the target at `zig cc`, which brings its own musl for every architecture. The binary lands in `target/<target>/release` and only runs on its own architecture.
 
 ### sccache
 
@@ -89,7 +99,7 @@ cache:
 go run ./scripts build 1.98
 ```
 
-This builds the base images inline, smoke tests every variant of a line for the local architecture and loads the images. The smoke test builds [`smoke/`](smoke), a crate depending on `zstd` and `ring`, as a static musl binary, rebuilds it to check for an sccache hit and runs its tests with `cargo nextest`. Pass `--platform linux/amd64` to run the same on Apple Silicon through emulation.
+This builds the base images inline, smoke tests every variant of a line for the local architecture and loads the images. The smoke test builds [`smoke/`](smoke), a crate depending on `zstd` and `ring`, as a static musl binary, rebuilds it to check for an sccache hit, runs its tests with `cargo nextest` and cross builds it for the other architecture with `cargo zigbuild`. Pass `--platform linux/amd64` to run the same on Apple Silicon through emulation.
 
 `configuration/bases.json` pins the alpine and Debian images by digest, `configuration/lines.json` pins the Rust version of each line, and `configuration/tools.json` pins the tool versions and their sha256 per architecture. `go run ./scripts update` refreshes all three.
 

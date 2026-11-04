@@ -65,6 +65,37 @@ func TestPin(t *testing.T) {
 	}
 }
 
+func TestWheelPin(t *testing.T) {
+	file := func(filename, character string) pypiFile {
+		var file pypiFile
+		file.Filename, file.Digests.SHA256 = filename, strings.Repeat(character, 64)
+
+		return file
+	}
+	zig := wheel{name: "zig", project: "ziglang"}
+
+	project := pypiProject{Files: []pypiFile{
+		file("ziglang-0.17.0-py3-none-macosx_13_0_x86_64.whl", "c"),
+		file("ziglang-0.17.0-py3-none-manylinux_2_12_x86_64.manylinux2010_x86_64.musllinux_1_1_x86_64.whl", "a"),
+		file("ziglang-0.17.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", "b"),
+	}}
+	project.Info.Version = "0.17.0"
+
+	pin, err := zig.pin(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if expected := map[string]string{"version": "0.17.0", "amd64": "sha256:" + strings.Repeat("a", 64), "arm64": "sha256:" + strings.Repeat("b", 64)}; !maps.Equal(pin, expected) {
+		t.Errorf("pin() = %v, expected %v", pin, expected)
+	}
+
+	project.Files = project.Files[:2]
+	if _, err := zig.pin(project); err == nil {
+		t.Error("pin() without an arm64 wheel succeeded, expected an error")
+	}
+}
+
 func TestSortedKeys(t *testing.T) {
 	if keys := sortedKeys(map[string]int{"1.9": 0, "1.85": 0, "1.10": 0, "sccache": 0, "just": 0}); !slices.Equal(keys, []string{"just", "sccache", "1.9", "1.10", "1.85"}) {
 		t.Errorf("sortedKeys() = %v", keys)

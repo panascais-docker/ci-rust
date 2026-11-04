@@ -45,6 +45,10 @@ var (
 		{name: "just", repository: "casey/just", release: regexp.MustCompile(`^(\d+\.\d+\.\d+)$`), asset: "just-%s-%s-unknown-linux-musl.tar.gz"},
 		{name: "sccache", repository: "mozilla/sccache", release: regexp.MustCompile(`^v(\d+\.\d+\.\d+)$`), asset: "sccache-v%s-%s-unknown-linux-musl.tar.gz"},
 	}
+	wheels = []wheel{
+		{name: "cargo-zigbuild", project: "cargo-zigbuild"},
+		{name: "zig", project: "ziglang"},
+	}
 )
 
 type base struct {
@@ -70,6 +74,25 @@ type githubRelease struct {
 type githubAsset struct {
 	Name   string `json:"name"`
 	Digest string `json:"digest"`
+}
+
+type wheel struct {
+	name    string
+	project string
+}
+
+type pypiProject struct {
+	Info struct {
+		Version string `json:"version"`
+	} `json:"info"`
+	Files []pypiFile `json:"urls"`
+}
+
+type pypiFile struct {
+	Filename string `json:"filename"`
+	Digests  struct {
+		SHA256 string `json:"sha256"`
+	} `json:"digests"`
 }
 
 func updateCommand() *cobra.Command {
@@ -275,6 +298,25 @@ func resolveTools(ctx context.Context) (configuration, error) {
 		pins[tool.name] = pin
 	}
 
+	for _, wheel := range wheels {
+		content, err := fetch(ctx, "https://pypi.org/pypi/"+wheel.project+"/json", nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var project pypiProject
+		if err := json.Unmarshal(content, &project); err != nil {
+			return nil, fmt.Errorf("parsing %s project: %w", wheel.project, err)
+		}
+
+		pin, err := wheel.pin(project)
+		if err != nil {
+			return nil, err
+		}
+
+		pins[wheel.name] = pin
+	}
+
 	release, err := fetch(ctx, rustupReleaseURL, nil)
 	if err != nil {
 		return nil, err
@@ -319,6 +361,23 @@ func (tool tool) pin(releases []githubRelease) (map[string]string, error) {
 	}
 
 	return nil, fmt.Errorf("no %s release found in %s", tool.name, tool.repository)
+}
+
+// The manylinux wheels hold static binaries, so they run on musl as well.
+func (wheel wheel) pin(project pypiProject) (map[string]string, error) {
+	pin := map[string]string{"version": project.Info.Version}
+	for _, architecture := range architectures {
+		index := slices.IndexFunc(project.Files, func(file pypiFile) bool {
+			return strings.Contains(file.Filename, "manylinux") && strings.HasSuffix(file.Filename, "_"+triples[architecture]+".whl")
+		})
+		if index < 0 || !digestPattern.MatchString("sha256:"+project.Files[index].Digests.SHA256) {
+			return nil, fmt.Errorf("%s %s has no manylinux %s wheel with a sha256 digest", wheel.project, project.Info.Version, triples[architecture])
+		}
+
+		pin[architecture] = "sha256:" + project.Files[index].Digests.SHA256
+	}
+
+	return pin, nil
 }
 
 func resolveRustup(ctx context.Context, version, libc string) (map[string]string, error) {

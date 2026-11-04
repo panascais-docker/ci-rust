@@ -223,6 +223,10 @@ func description(build build, arguments map[string]string) string {
 		versions = append(versions, tool.name+" "+arguments[argumentPrefix(tool.name)+"_VERSION"])
 	}
 
+	for _, wheel := range wheels {
+		versions = append(versions, wheel.name+" "+arguments[argumentPrefix(wheel.name)+"_VERSION"])
+	}
+
 	return "Panascais Rust Continuous Integration Image (" + strings.Join(versions, ", ") + ")"
 }
 

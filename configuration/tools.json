@@ -9,6 +9,11 @@
         "arm64": "sha256:a9ee2d53cf0711d879f068c0ff814b6fe3af3f9be8799f8ab484e47571087160",
         "version": "0.9.151"
     },
+    "cargo-zigbuild": {
+        "amd64": "sha256:484412e39e4c6039474535ce97ee75a22bab22d58233056f8ec8a8f9034bb957",
+        "arm64": "sha256:6942e4320f7b05d8fb29e0a8ce5670bcbb3d254275100b85b5b7c86552f9a744",
+        "version": "0.24.0"
+    },
     "just": {
         "amd64": "sha256:409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e",
         "arm64": "sha256:23871b1702bfd550fb5f901778fd4290ecf2ee034a45a889fbe96d89b188086d",
@@ -28,5 +33,10 @@
         "amd64": "sha256:aa73c7270c997894038c0d8f0d297865f57569e1687883322bc431713d4bb9dd",
         "arm64": "sha256:3e47fc4a71b1ddd1b4294a0de9d34498922fdf41e3cd0bda5df3954e3d6deb9d",
         "version": "0.19.0"
+    },
+    "zig": {
+        "amd64": "sha256:97079827064a7492cce5541ceb438ae8003ce1e54e399676da2d62fb7a5dc08b",
+        "arm64": "sha256:d2804f94f54f7fcf8169f4b212a619ad688a4e2e6592e976f0cf2e58e2cd8af3",
+        "version": "0.17.0"
     }
 }

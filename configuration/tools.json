@@ -10,9 +10,9 @@
         "version": "0.9.151"
     },
     "cargo-zigbuild": {
-        "amd64": "sha256:484412e39e4c6039474535ce97ee75a22bab22d58233056f8ec8a8f9034bb957",
-        "arm64": "sha256:6942e4320f7b05d8fb29e0a8ce5670bcbb3d254275100b85b5b7c86552f9a744",
-        "version": "0.24.0"
+        "amd64": "sha256:238a1ab54a95053a4eadc34775c81f795a8ad75f80bfed63f3f445f518102375",
+        "arm64": "sha256:07c5e3dcddf208500462ec927c556bb306cca2b533b0abe29446bffb63767b85",
+        "version": "0.24.1"
     },
     "just": {
         "amd64": "sha256:409044617b6f06517c1035e55ca38c8c856ff8b650e41bc2aa1ef82d5903a23e",

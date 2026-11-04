@@ -15,7 +15,7 @@ jobs:
     plan:
         name: plan
         if: "!contains(github.event.head_commit.message, '[skip ci]')"
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         outputs:
             bases: ${{ steps.plan.outputs.bases }}
             lines: ${{ steps.plan.outputs.lines }}
@@ -133,7 +133,7 @@ jobs:
         name: publish
         needs: [plan, build]
         if: ${{ !failure() && !cancelled() && needs.plan.outputs.lines != '[]' }}
-        runs-on: blacksmith-2vcpu-ubuntu-2404
+        runs-on: ubuntu-latest
         steps:
             - name: pull repository
               uses: actions/checkout@v6

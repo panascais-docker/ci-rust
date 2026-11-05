@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"maps"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -317,10 +319,12 @@ func bake(builds []build, arguments map[string]string, platform, stage string, e
 		return err
 	}
 
-	process := command("docker", slices.Concat([]string{"buildx", "bake", "--file", "-", "--progress=plain"}, flags)...)
-	process.Stdin = bytes.NewReader(definition)
+	return retryRateLimited(func() *exec.Cmd {
+		process := command("docker", slices.Concat([]string{"buildx", "bake", "--file", "-", "--progress=plain"}, flags)...)
+		process.Stdin = bytes.NewReader(definition)
 
-	return process.Run()
+		return process
+	})
 }
 
 func bakeDefinition(builds []build, arguments map[string]string, platform, stage string, export export) ([]byte, error) {
@@ -370,6 +374,23 @@ func command(name string, arguments ...string) *exec.Cmd {
 	process.Stdout, process.Stderr = os.Stdout, os.Stderr
 
 	return process
+}
+
+func retryRateLimited(create func() *exec.Cmd) error {
+	for attempt := 0; ; attempt++ {
+		var stderr bytes.Buffer
+		process := create()
+		process.Stderr = io.MultiWriter(process.Stderr, &stderr)
+
+		err := process.Run()
+		if err == nil || attempt == 5 || !strings.Contains(stderr.String(), "429 Too Many Requests") {
+			return err
+		}
+
+		delay := time.Duration(30<<attempt)*time.Second + rand.N(30*time.Second)
+		_, _ = fmt.Fprintf(os.Stderr, "rate limited by a registry, retrying in %s\n", delay.Round(time.Second))
+		time.Sleep(delay)
+	}
 }
 
 func output(name string, arguments ...string) (string, error) {

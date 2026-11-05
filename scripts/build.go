@@ -20,7 +20,7 @@ import (
 
 const (
 	digestsDirectory = "digests"
-	defaultVariant   = "alpine"
+	defaultVariant   = "trixie"
 )
 
 type registry struct {

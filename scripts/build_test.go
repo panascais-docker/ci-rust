@@ -13,10 +13,10 @@ func TestResolveNames(t *testing.T) {
 		line, variant, version string
 		expected               []string
 	}{
-		{"1.85", "alpine", "1.85.1", []string{"1.85-alpine", "1.85.1-alpine", "1.85", "1.85.1"}},
-		{"1.85", "trixie", "1.85.1", []string{"1.85-trixie", "1.85.1-trixie"}},
-		{"1.98", "alpine", "1.98.1", []string{"1.98-alpine", "1.98.1-alpine", "1-alpine", "latest-alpine", "1.98", "1.98.1", "1", "latest"}},
-		{"1.98", "trixie", "1.98.1", []string{"1.98-trixie", "1.98.1-trixie", "1-trixie", "latest-trixie"}},
+		{"1.85", "alpine", "1.85.1", []string{"1.85-alpine", "1.85.1-alpine"}},
+		{"1.85", "trixie", "1.85.1", []string{"1.85-trixie", "1.85.1-trixie", "1.85", "1.85.1"}},
+		{"1.98", "alpine", "1.98.1", []string{"1.98-alpine", "1.98.1-alpine", "1-alpine", "latest-alpine"}},
+		{"1.98", "trixie", "1.98.1", []string{"1.98-trixie", "1.98.1-trixie", "1-trixie", "latest-trixie", "1.98", "1.98.1", "1", "latest"}},
 	} {
 		if actual := resolveNames(lines, testCase.line, testCase.variant, testCase.version); !slices.Equal(actual, testCase.expected) {
 			t.Errorf("resolveNames(%s, %s) = %q, expected %q", testCase.line, testCase.variant, actual, testCase.expected)
@@ -53,12 +53,12 @@ func TestPlanBuilds(t *testing.T) {
 func TestPlanManifests(t *testing.T) {
 	digest := func(character string) string { return "sha256:" + strings.Repeat(character, 64) }
 	lines := configuration{"1.98": {"version": "1.98.1"}}
-	basePins := configuration{"alpine": {"image": "mirror.gcr.io/library/alpine:3.24", "digest": digest("a")}}
-	fingerprints := configuration{"1.98": {"alpine": digest("d")}}
+	basePins := configuration{"trixie": {"image": "mirror.gcr.io/library/debian:trixie-slim", "digest": digest("a")}}
+	fingerprints := configuration{"1.98": {"trixie": digest("d")}}
 
 	creations, err := planManifests(map[string]configuration{
-		"amd64": {"1.98": {"alpine": digest("b")}},
-		"arm64": {"1.98": {"alpine": digest("c")}},
+		"amd64": {"1.98": {"trixie": digest("b")}},
+		"arm64": {"1.98": {"trixie": digest("c")}},
 	}, lines, basePins, fingerprints)
 	if err != nil {
 		t.Fatal(err)
@@ -71,10 +71,10 @@ func TestPlanManifests(t *testing.T) {
 	expected := []string{
 		"buildx", "imagetools", "create",
 		"--annotation", "index:net.panascais.docker.ci-rust.fingerprint=" + digest("d"),
-		"--tag", "quay.io/panascais/ci-rust:1.98-alpine",
-		"--tag", "quay.io/panascais/ci-rust:1.98.1-alpine",
-		"--tag", "quay.io/panascais/ci-rust:1-alpine",
-		"--tag", "quay.io/panascais/ci-rust:latest-alpine",
+		"--tag", "quay.io/panascais/ci-rust:1.98-trixie",
+		"--tag", "quay.io/panascais/ci-rust:1.98.1-trixie",
+		"--tag", "quay.io/panascais/ci-rust:1-trixie",
+		"--tag", "quay.io/panascais/ci-rust:latest-trixie",
 		"--tag", "quay.io/panascais/ci-rust:1.98",
 		"--tag", "quay.io/panascais/ci-rust:1.98.1",
 		"--tag", "quay.io/panascais/ci-rust:1",
@@ -86,13 +86,13 @@ func TestPlanManifests(t *testing.T) {
 		t.Errorf("planManifests() = %q, expected %q", creations[2], expected)
 	}
 
-	if _, err := planManifests(map[string]configuration{"amd64": {"1.98": {"alpine": digest("b")}}}, lines, basePins, fingerprints); err == nil {
+	if _, err := planManifests(map[string]configuration{"amd64": {"1.98": {"trixie": digest("b")}}}, lines, basePins, fingerprints); err == nil {
 		t.Error("planManifests() without an arm64 digest succeeded, expected an error")
 	}
 
 	if _, err := planManifests(map[string]configuration{
-		"amd64": {"1.98": {"alpine": digest("b")}},
-		"arm64": {"1.98": {"alpine": digest("c")}},
+		"amd64": {"1.98": {"trixie": digest("b")}},
+		"arm64": {"1.98": {"trixie": digest("c")}},
 	}, lines, basePins, configuration{}); err == nil {
 		t.Error("planManifests() without a fingerprint succeeded, expected an error")
 	}

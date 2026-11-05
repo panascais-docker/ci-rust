@@ -36,8 +36,8 @@ var (
 	rustupPattern   = regexp.MustCompile(`(?m)^version = '(\d+\.\d+\.\d+)'$`)
 	checksumPattern = regexp.MustCompile(`^([0-9a-f]{64})\s`)
 	bases           = []base{
-		{variant: "alpine", repository: "mirror.gcr.io/library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
-		{variant: "trixie", repository: "mirror.gcr.io/library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
+		{variant: "alpine", repository: "docker.io/library/alpine", tag: regexp.MustCompile(`^3\.\d+$`)},
+		{variant: "trixie", repository: "docker.io/library/debian", tag: regexp.MustCompile(`^trixie-slim$`)},
 	}
 	tools = []tool{
 		{name: "cargo-deny", repository: "EmbarkStudios/cargo-deny", release: regexp.MustCompile(`^(\d+\.\d+\.\d+)$`), asset: "cargo-deny-%s-%s-unknown-linux-musl.tar.gz"},
@@ -274,9 +274,8 @@ func fetchDigest(ctx context.Context, image, pinned string) (string, error) {
 	return head.Digest.String(), nil
 }
 
-// listing tags is not a pull, and docker hub shows new releases before the mirror has cached them
 func upstreamTags(ctx context.Context, repository string) ([]string, error) {
-	return crane.ListTags(strings.TrimPrefix(repository, "mirror.gcr.io/"), append(registryOptions(ctx), func(options *crane.Options) {
+	return crane.ListTags(strings.TrimPrefix(repository, "docker.io/"), append(registryOptions(ctx), func(options *crane.Options) {
 		options.Name = append(options.Name, name.WithDefaultRegistry("registry-1.docker.io"))
 	})...)
 }

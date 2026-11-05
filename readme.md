@@ -110,6 +110,8 @@ GitHub Actions splits the work into four jobs:
 - `build` installs the toolchain of each line on top, again natively per architecture, and pushes by digest.
 - `publish` tags both architectures together, so every tag is a manifest list for both platforms.
 
+Every job pulls Docker Hub images, BuildKit included, through `mirror.gcr.io` to stay clear of Docker Hub rate limits, and falls back to Docker Hub only when the mirror has not cached an image yet.
+
 A monthly run on the 1st rebuilds everything to pick up fresh Alpine and Debian packages, which are the only unpinned inputs.
 
 ## Contributors

@@ -25,9 +25,7 @@ jobs:
               id: repository
 
             - name: setup docker builder
-              uses: docker/setup-buildx-action@v4
-              with:
-                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+              uses: ./.github/actions/setup-builder
 
             - name: install go
               id: go
@@ -65,9 +63,7 @@ jobs:
               id: repository
 
             - name: setup docker builder
-              uses: docker/setup-buildx-action@v4
-              with:
-                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+              uses: ./.github/actions/setup-builder
 
             - name: install go
               id: go
@@ -107,9 +103,7 @@ jobs:
               id: repository
 
             - name: setup docker builder
-              uses: docker/setup-buildx-action@v4
-              with:
-                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+              uses: ./.github/actions/setup-builder
 
             - name: install go
               id: go
@@ -149,9 +143,7 @@ jobs:
               id: repository
 
             - name: setup docker builder
-              uses: docker/setup-buildx-action@v4
-              with:
-                  driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1
+              uses: ./.github/actions/setup-builder
 
             - name: install go
               id: go

@@ -1,8 +1,8 @@
 {
     "cargo-deny": {
-        "amd64": "sha256:a2170b854ff697e79e39c4c538981c9c1bdd803addbae6719a4cb66b4585a903",
-        "arm64": "sha256:47cc5d88d43cd568028080fece02d729f56f0ff8e6c168563ce6589e3c0f4738",
-        "version": "0.21.0"
+        "amd64": "sha256:98c56e6a408bfa5c3c60744b6015aaa6aa08f743fdeb88386d06fca035bb1786",
+        "arm64": "sha256:4818d44cdcac285776336504fca722493ab634d3377b94a462e98aad3f41484a",
+        "version": "0.22.0"
     },
     "cargo-nextest": {
         "amd64": "sha256:521c5f790ed07ee69d0a88403d9d86a8c8ab27977f12fc73f22aa4e7e14a0f71",

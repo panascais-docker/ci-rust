@@ -1,4 +1,9 @@
 {
+    "cargo-audit": {
+        "rust": "1.100.0",
+        "sha256": "sha256:956f85aedfb64db887ec38466f982fc2b1ae55de726d4a12f2fddd5b812c6446",
+        "version": "0.23.0"
+    },
     "cargo-deny": {
         "amd64": "sha256:98c56e6a408bfa5c3c60744b6015aaa6aa08f743fdeb88386d06fca035bb1786",
         "arm64": "sha256:4818d44cdcac285776336504fca722493ab634d3377b94a462e98aad3f41484a",

@@ -210,9 +210,12 @@ func buildArguments(toolPins configuration, revision string) map[string]string {
 
 	for name, pin := range toolPins {
 		prefix := argumentPrefix(name)
-		arguments[prefix+"_VERSION"] = pin["version"]
-		for _, architecture := range architectures {
-			arguments[prefix+"_SHA256_"+strings.ToUpper(architecture)] = pin[architecture]
+		for field, value := range pin {
+			if slices.Contains(architectures, field) {
+				field = "sha256_" + field
+			}
+
+			arguments[prefix+"_"+strings.ToUpper(field)] = value
 		}
 	}
 
@@ -227,6 +230,10 @@ func description(build build, arguments map[string]string) string {
 
 	for _, wheel := range wheels {
 		versions = append(versions, wheel.name+" "+arguments[argumentPrefix(wheel.name)+"_VERSION"])
+	}
+
+	for _, crate := range crates {
+		versions = append(versions, crate.name+" "+arguments[argumentPrefix(crate.name)+"_VERSION"])
 	}
 
 	return "Panascais Rust Continuous Integration Image (" + strings.Join(versions, ", ") + ")"

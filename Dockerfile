@@ -6,6 +6,8 @@ ARG TOOLCHAIN_BASE=base
 FROM --platform=$BUILDPLATFORM docker.io/library/alpine:3.24 AS tools
 
 ARG TARGETARCH
+ARG CARGO_AUDIT_SHA256
+ARG CARGO_AUDIT_VERSION
 ARG CARGO_DENY_VERSION
 ARG CARGO_DENY_SHA256_AMD64
 ARG CARGO_DENY_SHA256_ARM64
@@ -40,6 +42,7 @@ RUN set -eu && \
     esac && \
     download() { curl -fsSL --retry 5 --retry-all-errors -o "$1" "$2" && echo "${3#sha256:}  $1" | sha256sum -c -s; } && \
     wheel() { url=$(curl -fsSL --retry 5 --retry-all-errors "https://pypi.org/simple/$2/" | grep -o "https://[^\"]*#sha256=${3#sha256:}") && download "$1" "${url%#*}" "$3"; } && \
+    download cargo-audit.crate "https://static.crates.io/crates/cargo-audit/cargo-audit-$CARGO_AUDIT_VERSION.crate" "$CARGO_AUDIT_SHA256" && \
     download cargo-deny.tar.gz "https://github.com/EmbarkStudios/cargo-deny/releases/download/$CARGO_DENY_VERSION/cargo-deny-$CARGO_DENY_VERSION-$triple.tar.gz" "$deny" && \
     download cargo-nextest.tar.gz "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-$CARGO_NEXTEST_VERSION/cargo-nextest-$CARGO_NEXTEST_VERSION-$triple.tar.gz" "$nextest" && \
     download just.tar.gz "https://github.com/casey/just/releases/download/$JUST_VERSION/just-$JUST_VERSION-$triple.tar.gz" "$just" && \
@@ -55,6 +58,25 @@ RUN set -eu && \
     unzip -q -d / zig.whl 'ziglang/zig' 'ziglang/lib/*' && \
     ln -s /usr/local/zig/zig /out/zig && \
     install -m 755 rustup-init-gnu rustup-init-musl /
+
+FROM docker.io/library/alpine:3.24 AS audit
+
+ARG CARGO_AUDIT_RUST
+ARG CARGO_AUDIT_VERSION
+
+ENV RUSTUP_HOME=/rustup \
+    CARGO_HOME=/cargo \
+    PATH=/cargo/bin:$PATH
+
+RUN apk add --no-cache build-base
+
+WORKDIR /build
+RUN --mount=type=bind,from=tools,source=/,target=/tmp/tools \
+    set -eu && \
+    /tmp/tools/rustup-init-musl -y --no-modify-path --profile minimal --default-toolchain "$CARGO_AUDIT_RUST" && \
+    tar -xzf /tmp/tools/downloads/cargo-audit.crate && \
+    cargo install --locked --path "cargo-audit-$CARGO_AUDIT_VERSION" --root /out && \
+    if readelf -l /out/bin/cargo-audit | grep -q INTERP; then echo "cargo-audit is dynamically linked" >&2; exit 1; fi
 
 FROM ${BASE_IMAGE} AS alpine
 
@@ -104,6 +126,7 @@ RUN --mount=type=bind,from=tools,source=/,target=/tmp/tools \
     "/tmp/tools/rustup-init-$libc" -y --no-modify-path --profile minimal --default-toolchain none --default-host "$(uname -m)-unknown-linux-$libc"
 
 COPY --from=tools /out/ /usr/local/cargo/bin/
+COPY --from=audit /out/bin/cargo-audit /usr/local/cargo/bin/
 COPY --from=tools /ziglang/ /usr/local/zig/
 
 ARG BASE_FINGERPRINT
@@ -119,6 +142,7 @@ RUN rustup toolchain install "$RUST_VERSION" --no-self-update --profile minimal 
 
 # smoke tests
 RUN cargo --version && \
+    cargo audit --version && \
     cargo clippy --version && \
     cargo deny --version && \
     cargo fmt --version && \
@@ -141,6 +165,7 @@ COPY smoke ./
 RUN set -eu && \
     target="$(uname -m)-unknown-linux-musl" && \
     cargo fmt --check && \
+    cargo audit && \
     cargo build --locked --release --target "$target" && \
     if readelf -l "target/$target/release/smoke" | grep -q INTERP; then echo "smoke binary is dynamically linked" >&2; exit 1; fi && \
     "target/$target/release/smoke" && \

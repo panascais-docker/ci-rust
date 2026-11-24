@@ -26,6 +26,8 @@ const (
 	manifestsURL     = "https://static.rust-lang.org/manifests.txt"
 	rustupURL        = "https://static.rust-lang.org/rustup"
 	rustupReleaseURL = rustupURL + "/release-stable.toml"
+	cratesURL        = "https://crates.io/api/v1/crates/"
+	userAgent        = "ci-rust (https://github.com/panascais-docker/ci-rust)"
 )
 
 var (
@@ -48,6 +50,9 @@ var (
 	wheels = []wheel{
 		{name: "cargo-zigbuild", project: "cargo-zigbuild"},
 		{name: "zig", project: "ziglang"},
+	}
+	crates = []crate{
+		{name: "cargo-audit"},
 	}
 )
 
@@ -86,6 +91,24 @@ type pypiProject struct {
 		Version string `json:"version"`
 	} `json:"info"`
 	Files []pypiFile `json:"urls"`
+}
+
+type crate struct {
+	name string
+}
+
+type cratesProject struct {
+	Crate struct {
+		MaxStableVersion string `json:"max_stable_version"`
+	} `json:"crate"`
+	Versions []crateVersion `json:"versions"`
+}
+
+type crateVersion struct {
+	Number      string `json:"num"`
+	Checksum    string `json:"checksum"`
+	RustVersion string `json:"rust_version"`
+	Yanked      bool   `json:"yanked"`
 }
 
 type pypiFile struct {
@@ -135,7 +158,7 @@ func update(ctx context.Context) error {
 		return err
 	}
 
-	toolPins, err := resolveTools(ctx)
+	toolPins, err := resolveTools(ctx, lines)
 	if err != nil {
 		return err
 	}
@@ -286,7 +309,7 @@ func registryOptions(ctx context.Context) []crane.Option {
 	}}
 }
 
-func resolveTools(ctx context.Context) (configuration, error) {
+func resolveTools(ctx context.Context, lines configuration) (configuration, error) {
 	pins := configuration{}
 	for _, tool := range tools {
 		content, err := fetch(ctx, "https://api.github.com/repos/"+tool.repository+"/releases", githubHeaders())
@@ -324,6 +347,30 @@ func resolveTools(ctx context.Context) (configuration, error) {
 		}
 
 		pins[wheel.name] = pin
+	}
+
+	keys := sortedKeys(lines)
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("no rust line from %s found", minimumLine)
+	}
+
+	for _, crate := range crates {
+		content, err := fetch(ctx, cratesURL+crate.name, map[string]string{"User-Agent": userAgent})
+		if err != nil {
+			return nil, err
+		}
+
+		var project cratesProject
+		if err := json.Unmarshal(content, &project); err != nil {
+			return nil, fmt.Errorf("parsing %s crate: %w", crate.name, err)
+		}
+
+		pin, err := crate.pin(project, lines[keys[len(keys)-1]]["version"])
+		if err != nil {
+			return nil, err
+		}
+
+		pins[crate.name] = pin
 	}
 
 	release, err := fetch(ctx, rustupReleaseURL, nil)
@@ -387,6 +434,20 @@ func (wheel wheel) pin(project pypiProject) (map[string]string, error) {
 	}
 
 	return pin, nil
+}
+
+func (crate crate) pin(project cratesProject, rust string) (map[string]string, error) {
+	version := project.Crate.MaxStableVersion
+	index := slices.IndexFunc(project.Versions, func(candidate crateVersion) bool { return candidate.Number == version && !candidate.Yanked })
+	if index < 0 || !digestPattern.MatchString("sha256:"+project.Versions[index].Checksum) {
+		return nil, fmt.Errorf("%s %q has no unyanked release with a sha256 checksum", crate.name, version)
+	}
+
+	if required := project.Versions[index].RustVersion; compareKeys(rust, required) < 0 {
+		return nil, fmt.Errorf("%s %s needs rust %s, newer than rust %s", crate.name, version, required, rust)
+	}
+
+	return map[string]string{"version": version, "sha256": "sha256:" + project.Versions[index].Checksum, "rust": rust}, nil
 }
 
 func resolveRustup(ctx context.Context, version, libc string) (map[string]string, error) {

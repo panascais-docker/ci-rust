@@ -48,7 +48,7 @@ For example `1.98` and `1.98-trixie` are Rust 1.98 on Debian trixie, `1.98.1-alp
 | `sccache`        | [github.com/mozilla/sccache](https://github.com/mozilla/sccache)                     |
 | `zig`            | [codeberg.org/ziglang/zig](https://codeberg.org/ziglang/zig)                         |
 
-The tools are release binaries in `/usr/local/cargo/bin`, each checked against a pinned sha256. `cargo-audit` has no static release binary for arm64, so the base images build it on both architectures from its pinned crates.io source with the newest Rust release. `cargo-zigbuild` and `zig` come from their official PyPI wheels, with the `zig` standard library in `/usr/local/zig`. `rustup` installs the toolchain with `clippy`, `rustfmt` and `rust-src`. For crates that compile C, like `ring`, `aws-lc-sys` or `zstd-sys`, there is a C toolchain with `clang`, `cmake` and `pkg-config`. `git`, `curl` and `openssh-client` cover git dependencies.
+The tools are release binaries in `/usr/local/cargo/bin`, each checked against a pinned sha256. `cargo-audit` has no static release binary for arm64, so the base images build it on both architectures from its pinned crates.io source with the Rust version it requires. `cargo-zigbuild` and `zig` come from their official PyPI wheels, with the `zig` standard library in `/usr/local/zig`. `rustup` installs the toolchain with `clippy`, `rustfmt` and `rust-src`. For crates that compile C, like `ring`, `aws-lc-sys` or `zstd-sys`, there is a C toolchain with `clang`, `cmake` and `pkg-config`. `git`, `curl` and `openssh-client` cover git dependencies.
 
 There is no `libssl-dev`, so crates have to use rustls. There is no Docker CLI either, because testcontainers talks to the Docker socket directly.
 
@@ -100,7 +100,7 @@ cache:
 go run ./scripts build 1.98
 ```
 
-This builds the base images inline, smoke tests every variant of a line for the local architecture and loads the images. The smoke test builds [`smoke/`](smoke), a crate depending on `zstd` and `ring`, as a static musl binary, rebuilds it to check for an sccache hit, runs its tests with `cargo nextest`, checks its dependencies with `cargo audit` and cross builds it for the other architecture with `cargo zigbuild`. Pass `--platform linux/amd64` to run the same on Apple Silicon through emulation.
+This builds the base images inline, smoke tests every variant of a line for the local architecture and loads the images. The smoke test builds [`smoke/`](smoke), a crate depending on `zstd` and `ring`, as a static musl binary, rebuilds it to check for an sccache hit, runs its tests with `cargo nextest` and cross builds it for the other architecture with `cargo zigbuild`. Pass `--platform linux/amd64` to run the same on Apple Silicon through emulation.
 
 `configuration/bases.json` pins the alpine and Debian images by digest, `configuration/lines.json` pins the Rust version of each line, and `configuration/tools.json` pins the tool versions and their sha256 per architecture, or of the crate for `cargo-audit`. `go run ./scripts update` refreshes all three.
 

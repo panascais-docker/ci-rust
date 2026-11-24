@@ -158,7 +158,7 @@ func update(ctx context.Context) error {
 		return err
 	}
 
-	toolPins, err := resolveTools(ctx, lines)
+	toolPins, err := resolveTools(ctx)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func registryOptions(ctx context.Context) []crane.Option {
 	}}
 }
 
-func resolveTools(ctx context.Context, lines configuration) (configuration, error) {
+func resolveTools(ctx context.Context) (configuration, error) {
 	pins := configuration{}
 	for _, tool := range tools {
 		content, err := fetch(ctx, "https://api.github.com/repos/"+tool.repository+"/releases", githubHeaders())
@@ -349,11 +349,6 @@ func resolveTools(ctx context.Context, lines configuration) (configuration, erro
 		pins[wheel.name] = pin
 	}
 
-	keys := sortedKeys(lines)
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("no rust line from %s found", minimumLine)
-	}
-
 	for _, crate := range crates {
 		content, err := fetch(ctx, cratesURL+crate.name, map[string]string{"User-Agent": userAgent})
 		if err != nil {
@@ -365,7 +360,7 @@ func resolveTools(ctx context.Context, lines configuration) (configuration, erro
 			return nil, fmt.Errorf("parsing %s crate: %w", crate.name, err)
 		}
 
-		pin, err := crate.pin(project, lines[keys[len(keys)-1]]["version"])
+		pin, err := crate.pin(project)
 		if err != nil {
 			return nil, err
 		}
@@ -436,15 +431,16 @@ func (wheel wheel) pin(project pypiProject) (map[string]string, error) {
 	return pin, nil
 }
 
-func (crate crate) pin(project cratesProject, rust string) (map[string]string, error) {
+func (crate crate) pin(project cratesProject) (map[string]string, error) {
 	version := project.Crate.MaxStableVersion
 	index := slices.IndexFunc(project.Versions, func(candidate crateVersion) bool { return candidate.Number == version && !candidate.Yanked })
 	if index < 0 || !digestPattern.MatchString("sha256:"+project.Versions[index].Checksum) {
 		return nil, fmt.Errorf("%s %q has no unyanked release with a sha256 checksum", crate.name, version)
 	}
 
-	if required := project.Versions[index].RustVersion; compareKeys(rust, required) < 0 {
-		return nil, fmt.Errorf("%s %s needs rust %s, newer than rust %s", crate.name, version, required, rust)
+	rust := project.Versions[index].RustVersion
+	if rust == "" {
+		return nil, fmt.Errorf("%s %s states no rust version", crate.name, version)
 	}
 
 	return map[string]string{"version": version, "sha256": "sha256:" + project.Versions[index].Checksum, "rust": rust}, nil

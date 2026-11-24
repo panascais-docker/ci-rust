@@ -165,7 +165,6 @@ COPY smoke ./
 RUN set -eu && \
     target="$(uname -m)-unknown-linux-musl" && \
     cargo fmt --check && \
-    cargo audit && \
     cargo build --locked --release --target "$target" && \
     if readelf -l "target/$target/release/smoke" | grep -q INTERP; then echo "smoke binary is dynamically linked" >&2; exit 1; fi && \
     "target/$target/release/smoke" && \

@@ -104,21 +104,22 @@ func TestCratePin(t *testing.T) {
 	}}
 	project.Crate.MaxStableVersion = "0.23.0"
 
-	pin, err := audit.pin(project, "1.100.0")
+	pin, err := audit.pin(project)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if expected := map[string]string{"version": "0.23.0", "sha256": "sha256:" + strings.Repeat("a", 64), "rust": "1.100.0"}; !maps.Equal(pin, expected) {
+	if expected := map[string]string{"version": "0.23.0", "sha256": "sha256:" + strings.Repeat("a", 64), "rust": "1.88"}; !maps.Equal(pin, expected) {
 		t.Errorf("pin() = %v, expected %v", pin, expected)
 	}
 
-	if _, err := audit.pin(project, "1.87.1"); err == nil {
-		t.Error("pin() below the crate's rust version succeeded, expected an error")
+	project.Versions[1].RustVersion = ""
+	if _, err := audit.pin(project); err == nil {
+		t.Error("pin() without a rust version succeeded, expected an error")
 	}
 
 	project.Versions[1].Yanked = true
-	if _, err := audit.pin(project, "1.100.0"); err == nil {
+	if _, err := audit.pin(project); err == nil {
 		t.Error("pin() of a yanked version succeeded, expected an error")
 	}
 }

@@ -1,6 +1,6 @@
 {
     "cargo-audit": {
-        "rust": "1.100.0",
+        "rust": "1.88",
         "sha256": "sha256:956f85aedfb64db887ec38466f982fc2b1ae55de726d4a12f2fddd5b812c6446",
         "version": "0.23.0"
     },
